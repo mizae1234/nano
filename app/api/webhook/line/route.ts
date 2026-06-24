@@ -436,18 +436,29 @@ export async function POST(request: NextRequest) {
           const profileUrl = `${appUrl}/login?redirect=${encodeURIComponent(redirectPath)}&tenant=${tenant.slug}`;
 
           const { profileCardFlex } = await import("@/lib/nano-reply");
-          await reply([
-            { type: "text", text: replyText } as never,
-            profileCardFlex(
-              {
-                displayName: targetUser.displayName,
-                employeeCode: targetUser.employeeCode,
-                departmentName: displayDeptName,
-              },
-              profileUrl,
-              botMeta
-            ) as never,
-          ]);
+          
+          if (sourceType === "user") {
+            await reply([
+              { type: "text", text: replyText } as never,
+              profileCardFlex(
+                {
+                  displayName: targetUser.displayName,
+                  employeeCode: targetUser.employeeCode,
+                  departmentName: displayDeptName,
+                },
+                profileUrl,
+                botMeta
+              ) as never,
+            ]);
+          } else {
+            // In group/room: only send text reply, do not expose profile card
+            await reply([
+              { 
+                type: "text", 
+                text: `${replyText}\n\n🔒 เพื่อความเป็นส่วนตัวสูงสุด คุณสามารถคลิกลิงก์ด้านล่าง หรือ พิมพ์คำสั่ง "โปรไฟล์" ในแชทส่วนตัวกับบอท เพื่อตรวจสอบและแก้ไขบัตรข้อมูลพนักงานของคุณได้เลยนะคะ 😊\n🔗 แก้ไขโปรไฟล์: ${profileUrl}` 
+              } as never,
+            ]);
+          }
           break;
         }
 
