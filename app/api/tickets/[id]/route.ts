@@ -230,16 +230,49 @@ export async function PATCH(
         // ส่ง LINE แจ้งเตือนเมื่อสถานะเปลี่ยนเป็น RESOLVED (แก้ไขแล้ว)
         if (body.status === "RESOLVED" && updated.notifyOnResolve && tenant?.lineOaToken) {
           try {
-            const ticketRef = updated.system?.ticketPrefix
-              ? `${updated.system.ticketPrefix}-${updated.ticketNo}`
-              : `#${updated.ticketNo}`;
-            const resolveMsg = `✅ ตั๋วงาน #${ticketRef} "${updated.title}" ได้รับการแก้ไขเรียบร้อยแล้วค่ะ`;
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://nano.technomand-ai.cloud";
+            const detailUrl = `${appUrl}/ticket/${updated.id}`;
 
+            const botConfig = await prisma.botConfig.findUnique({
+              where: { tenantId: session.tenantId },
+              select: { botName: true, botPersona: true, themeColor: true },
+            });
+            const botMeta = {
+              botName: botConfig?.botName,
+              botPersona: botConfig?.botPersona,
+              themeColor: botConfig?.themeColor || "#0066FF",
+            };
+
+            const dept = updated.departmentId 
+              ? await prisma.department.findUnique({ where: { id: updated.departmentId }, select: { name: true } })
+              : null;
+
+            const sys = updated.systemId
+              ? await prisma.system.findUnique({ where: { id: updated.systemId }, select: { name: true, icon: true, ticketPrefix: true } })
+              : null;
+
+            const { ticketResolvedFlex } = await import("@/lib/nano-reply");
             const { pushMessage } = await import("@/lib/line");
+
+            const flexMessage = ticketResolvedFlex(
+              {
+                ticketNo: updated.ticketNo,
+                title: updated.title,
+                status: updated.status,
+                priority: updated.priority,
+                departmentName: dept?.name || undefined,
+                systemPrefix: sys?.ticketPrefix || undefined,
+                systemName: sys?.name || undefined,
+                systemIcon: sys?.icon || undefined,
+                createdAt: updated.createdAt.toLocaleDateString("th-TH"),
+              },
+              detailUrl,
+              botMeta
+            );
 
             if (updated.notifyChannel === "DIRECT" && updated.createdBy.lineUid) {
               await pushMessage(tenant.lineOaToken, updated.createdBy.lineUid, [
-                { type: "text", text: resolveMsg } as any,
+                flexMessage as any,
               ]);
             } else if (updated.notifyChannel === "GROUP" && updated.notifyGroupId) {
               const g = await prisma.groupConfig.findUnique({
@@ -248,7 +281,7 @@ export async function PATCH(
               });
               if (g?.lineGroupId) {
                 await pushMessage(tenant.lineOaToken, g.lineGroupId, [
-                  { type: "text", text: resolveMsg } as any,
+                  flexMessage as any,
                 ]);
               }
             }

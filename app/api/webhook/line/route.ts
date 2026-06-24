@@ -708,6 +708,86 @@ export async function POST(request: NextRequest) {
           break;
         }
 
+        case "CLOSE_TICKET": {
+          const closeWhere: Record<string, any> = {
+            tenantId: tenant.id,
+            ticketNo: parseInt(action.ticketNo),
+          };
+
+          if (action.systemPrefix) {
+            const prefixSystem = await prisma.system.findFirst({
+              where: {
+                tenantId: tenant.id,
+                ticketPrefix: action.systemPrefix,
+                isActive: true,
+              },
+            });
+            if (prefixSystem) closeWhere.systemId = prefixSystem.id;
+          }
+
+          const foundTicket = await prisma.ticket.findFirst({
+            where: closeWhere,
+            include: {
+              createdBy: { select: { id: true, displayName: true, lineUid: true } },
+              system: { select: { ticketPrefix: true } },
+            },
+          });
+
+          if (!foundTicket) {
+            const displayNo = action.systemPrefix
+              ? `${action.systemPrefix}-${action.ticketNo}`
+              : `#${action.ticketNo}`;
+            await reply([
+              { type: "text", text: `ไม่พบ Ticket ${displayNo} ในระบบค่ะ` } as never,
+            ]);
+            break;
+          }
+
+          const isIT = user && (user.role === "IT" || user.role === "ADMIN" || user.role === "SUPER_ADMIN");
+          const isCreator = lineUid && lineUid === foundTicket.createdBy.lineUid;
+
+          if (!isIT && !isCreator) {
+            await reply([
+              { type: "text", text: "ขออภัยค่ะ เฉพาะผู้สร้างตั๋วงานหรือเจ้าหน้าที่ IT เท่านั้นที่สามารถปิดตั๋วงานนี้ได้ค่ะ" } as never,
+            ]);
+            break;
+          }
+
+          const ticketRef = foundTicket.system?.ticketPrefix
+            ? `${foundTicket.system.ticketPrefix}-${foundTicket.ticketNo}`
+            : `#${foundTicket.ticketNo}`;
+
+          if (foundTicket.status === "CLOSED") {
+            await reply([
+              { type: "text", text: `ตั๋วงาน #${ticketRef} ได้รับการปิดเรียบร้อยแล้วก่อนหน้านี้ค่ะ` } as never,
+            ]);
+            break;
+          }
+
+          await prisma.ticket.update({
+            where: { id: foundTicket.id },
+            data: { status: "CLOSED" },
+          });
+
+          await prisma.auditLog.create({
+            data: {
+              tenantId: tenant.id,
+              ticketId: foundTicket.id,
+              userId: user?.id || foundTicket.createdById,
+              action: "UPDATED",
+              detail: "เปลี่ยนสถานะเป็น CLOSED ผ่าน LINE Bot (Quick Menu)",
+            },
+          });
+
+          await reply([
+            {
+              type: "text",
+              text: `🙏 ขอบคุณค่ะ! น้องนาโนได้ทำการปิดตั๋วงาน #${ticketRef} "${foundTicket.title}" ให้เรียบร้อยแล้วค่ะ`,
+            } as never,
+          ]);
+          break;
+        }
+
         case "FOLLOW_TICKET": {
           if (!user) {
             await reply([

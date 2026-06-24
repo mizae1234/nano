@@ -609,3 +609,58 @@ export function quickActionFlex(ticket: TicketInfo, detailUrl: string, bot?: Bot
     },
   };
 }
+
+// ══════════════════════════════════════════════════════════════
+//  TICKET RESOLVED FLEX ✨
+// ══════════════════════════════════════════════════════════════
+
+export function ticketResolvedFlex(ticket: TicketInfo, detailUrl: string, bot?: BotMeta) {
+  const { botName, themeColor } = meta(bot);
+  const ticketRef = ticket.systemPrefix ? `${ticket.systemPrefix}-${ticket.ticketNo}` : `${ticket.ticketNo}`;
+  const resolveColor = "#10B981"; // Emerald green
+
+  return {
+    type: "flex", altText: `✅ ตั๋วงาน #${ticketRef} แก้ไขเรียบร้อยแล้ว`,
+    contents: {
+      type: "bubble", size: "kilo",
+      header: {
+        type: "box", layout: "horizontal", paddingAll: "10px",
+        backgroundColor: resolveColor, alignItems: "center",
+        contents: [
+          { type: "text", text: botName, size: "xxs", color: "#ffffff", flex: 3 },
+          { type: "text", text: "✅ แก้ไขปัญหาเรียบร้อยแล้ว", size: "xxs", color: "#ffffffcc", align: "end", flex: 5 },
+        ],
+      },
+      body: {
+        type: "box", layout: "vertical", paddingAll: "12px", spacing: "sm",
+        contents: [
+          {
+            type: "box", layout: "horizontal", alignItems: "center",
+            contents: [
+              { type: "text", text: `#${ticketRef}`, weight: "bold", size: "lg", color: resolveColor, flex: 0 },
+              ...(ticket.systemName ? [{ type: "text" as const, text: `${ticket.systemIcon || "⚙️"} ${ticket.systemName}`, size: "xxs" as const, color: "#888888", align: "end" as const, flex: 1 }] : []),
+            ],
+          },
+          { type: "text", text: ticket.title, size: "sm", wrap: true, color: "#333333", weight: "bold" },
+          { type: "text", text: "เจ้าหน้าที่ได้ทำการแก้ไขปัญหาดังกล่าวเรียบร้อยแล้วค่ะ หากได้รับการแก้ไขอย่างถูกต้องแล้ว รบกวนกดปุ่ม \"🔒 ปิดงาน\" ด้านล่างเพื่อจบตั๋วงานด้วยนะคะ 😊", size: "xs", wrap: true, color: "#666666" },
+          { type: "separator", margin: "sm" },
+          {
+            type: "box", layout: "vertical", spacing: "xs",
+            contents: [
+              infoRow("สถานะ", "แก้ไขแล้ว"),
+              infoRow("ความสำคัญ", `${PRIORITY_EMOJI[ticket.priority] || ""} ${PRIORITY_LABEL[ticket.priority as keyof typeof PRIORITY_LABEL] || ticket.priority}`),
+              ...(ticket.departmentName ? [infoRow("แผนก", ticket.departmentName)] : []),
+            ],
+          },
+        ],
+      },
+      footer: {
+        type: "box", layout: "vertical", spacing: "sm", paddingAll: "10px",
+        contents: [
+          { type: "button", action: { type: "message", label: "🔒 ปิดงาน (Close)", text: `ปิด ${ticketRef}` }, style: "primary", color: "#EF4444", height: "sm" },
+          { type: "button", action: { type: "uri", label: "🌐 ดูรายละเอียดในเว็บ", uri: detailUrl }, style: "secondary", height: "sm" },
+        ],
+      },
+    },
+  };
+}
