@@ -86,7 +86,8 @@ export function parseNanoCommand(
         startsWith(text, STATUS_WORDS).match ||
         startsWith(text, CLOSE_WORDS).match ||
         startsWith(text, CREATE_WORDS).match ||
-        includes(text, SUMMARY_WORDS);
+        includes(text, SUMMARY_WORDS) ||
+        includes(text, ["ลงทะเบียน", "profile", "โปรไฟล์", "บัตรพนักงาน"]);
 
       if (!isCommand) return null;
     }
@@ -95,7 +96,16 @@ export function parseNanoCommand(
   if (!text) return { action: "SHOW_MENU" };
 
   // ─── 0.1. ลงทะเบียน ───────────────────────────────────────
-  if (text.startsWith("ลงทะเบียน") || text.includes("ลงทะเบียน")) {
+  const lowerText = text.toLowerCase();
+  const isProfileRequest =
+    lowerText === "profile" ||
+    text === "โปรไฟล์" ||
+    text === "แก้ไขโปรไฟล์" ||
+    text === "แก้ไข profile" ||
+    text === "บัตรพนักงาน" ||
+    text === "บัตรข้อมูลพนักงาน";
+
+  if (text.startsWith("ลงทะเบียน") || text.includes("ลงทะเบียน") || isProfileRequest) {
     const codeMatch = text.match(/รหัสพนักงาน\s*(\S+)/);
     const nameMatch = text.match(/ชื่อ\s*([^\sแผนก]+)/) || text.match(/ชื่อ\s*(\S+)/);
     const deptMatch = text.match(/แผนก\s*(\S+)/);
