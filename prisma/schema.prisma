@@ -48,6 +48,36 @@ model Tenant {
   auditLogs      AuditLog[]
   systems        System[]
   groupConfigs   GroupConfig[]
+  botConfig      BotConfig?
+}
+
+// ─── BOT CONFIG (per tenant) ─────────────────────────────────
+
+model BotConfig {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+
+  // Persona
+  botName        String   @default("น้องนาโน")
+  botPersona     String   @default("ค่ะ")           // ลงท้าย: ค่ะ / ครับ / สิ / จ้า
+  themeColor     String   @default("#0066FF")
+
+  // Messages
+  welcomeMessage String   @default("สวัสดีค่ะ ยินดีต้อนรับสู่ระบบ Service Ticket 🎉\nพิมพ์ \"ช่วย\" เพื่อดูเมนูการใช้งานค่ะ")
+  menuMessage    String   @default("เลือกสิ่งที่ต้องการค่ะ 😊")
+
+  // Trigger words (comma-separated) เช่น "นาโน,nano,@nano"
+  triggerWords   String   @default("นาโน,@นาโน,nano,@nano")
+
+  // AI System Prompt (override default)
+  systemPrompt   String?  // null = ใช้ default prompt
+
+  // AI Model
+  aiModel        String   @default("gemini-2.0-flash")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 enum Plan {
