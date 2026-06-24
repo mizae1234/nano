@@ -48,6 +48,7 @@ model Tenant {
   auditLogs      AuditLog[]
   systems        System[]
   groupConfigs   GroupConfig[]
+  chatLogs       ChatLog[]
   botConfig      BotConfig?
 }
 
@@ -129,6 +130,7 @@ model User {
   comments          TicketComment[]
   auditLogs         AuditLog[]
   defaultForSystems System[]        @relation("DefaultAssignee")
+  ticketFollowers   TicketFollower[]
 
   @@unique([tenantId, lineUid])
 }
@@ -182,6 +184,18 @@ model GroupConfig {
   lineGroupId   String                      // LINE Group ID
   name          String                      // ชื่อที่ PM ตั้ง เช่น "กลุ่ม Support Saran"
   isActive      Boolean  @default(true)
+
+  // Auto-join tracking (set when nano joins via LINE webhook)
+  autoJoined    Boolean  @default(false)
+  memberCount   Int?                        // จำนวนสมาชิก (optional)
+
+  // Push notification config
+  pushOnNewTicket  Boolean @default(false)  // แจ้งเมื่อมี ticket ใหม่
+  pushOnUrgent     Boolean @default(true)   // แจ้งเมื่อ ticket ด่วน
+  pushOnResolved   Boolean @default(false)  // แจ้งเมื่อ ticket แก้ไขแล้ว
+  pushOnAssigned   Boolean @default(false)  // แจ้งเมื่อมีการมอบหมายงาน
+  pushTemplate     String?                  // custom message template (null = ใช้ default)
+
   createdAt     DateTime @default(now())
 
   groupSystems  GroupSystem[]
@@ -229,11 +243,13 @@ model Ticket {
   assignedToId String?
   assignedTo   User?        @relation("AssignedTo", fields: [assignedToId], references: [id])
   resolvedAt   DateTime?
+  dueDate      DateTime?                      // วันที่คาดว่าจะเสร็จสิ้น
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
   comments     TicketComment[]
   auditLogs    AuditLog[]
+  followers    TicketFollower[]
 
   @@index([tenantId, status])
   @@index([tenantId, departmentId])
@@ -299,4 +315,35 @@ model MigrationLog {
   completedAt DateTime?
   error       String?
   createdAt   DateTime  @default(now())
+}
+
+// ─── CHAT LOG (LINE Message History) ─────────────────────────
+
+model ChatLog {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  lineUid     String
+  displayName String?
+  lineGroupId String?
+  messageText String?
+  direction   String   @default("INCOMING") // INCOMING | OUTGOING
+  replyAction String?                        // action type e.g. CREATE_TICKET, SHOW_MENU
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, lineUid])
+}
+
+// ─── TICKET FOLLOWER (Follow/Notify) ─────────────────────────
+
+model TicketFollower {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([ticketId, userId])
 }

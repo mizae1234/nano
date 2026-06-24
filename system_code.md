@@ -36,6 +36,7 @@ nano/
 │   │   ├── dept/members/page.tsx     # สมาชิกในแผนก
 │   │   ├── admin/page.tsx            # ทุก Ticket (ADMIN)
 │   │   ├── admin/users/page.tsx      # จัดการผู้ใช้
+│   │   ├── admin/chatlogs/page.tsx   # รายการ Chat Logs (SUPER_ADMIN)
 │   │   ├── admin/departments/page.tsx # จัดการแผนก
 │   │   ├── admin/categories/page.tsx # จัดการหมวดหมู่
 │   │   ├── admin/report/page.tsx     # รายงานและสถิติ
@@ -48,6 +49,7 @@ nano/
 │       ├── tickets/route.ts              # GET (list) + POST (create)
 │       ├── tickets/[id]/route.ts         # GET (detail) + PATCH (update)
 │       ├── tickets/[id]/comments/route.ts # GET + POST comments
+│       ├── chatlogs/route.ts             # GET Chat Logs (SUPER_ADMIN)
 │       ├── users/route.ts               # GET + POST users
 │       ├── users/[id]/role/route.ts      # PATCH role
 │       ├── users/[id]/department/route.ts # PATCH department
@@ -116,8 +118,11 @@ nano/
 LINE → Webhook → validateSignature → parseNanoCommand → NanoAction
                                                           ↓
                                     ┌─── CREATE_TICKET → สร้าง ticket + ticketCreatedFlex
+                                    ├─── ASSIGN_NOTE → สร้าง ticket + assignedTo + dueDate + text reply
                                     ├─── LIST_TICKETS → query + ticketListFlex (carousel)
                                     ├─── CHECK_STATUS → query + ticketStatusFlex
+                                    ├─── FOLLOW_TICKET → Toggle TicketFollower + followTicketFlex
+                                    ├─── GROUP_SUMMARY → query stats + groupSummaryFlex
                                     ├─── GEMINI_QUERY → queryDatabase → text reply
                                     ├─── SHOW_MENU → menuFlex
                                     └─── UPGRADE_REQUIRED → upgradeRequiredFlex

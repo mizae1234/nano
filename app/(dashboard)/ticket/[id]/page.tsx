@@ -253,7 +253,7 @@ export default function TicketDetailPage() {
   const priorityInfo = PRIORITY_OPTIONS.find((p) => p.value === ticket.priority) || PRIORITY_OPTIONS[0];
   const typeInfo = TICKET_TYPE_CONFIG[ticket.ticketType] || TICKET_TYPE_CONFIG.BUG;
   const ticketDisplay = ticket.system
-    ? `${ticket.system.ticketPrefix}-${ticket.ticketNo}`
+    ? `#${ticket.system.ticketPrefix}-${ticket.ticketNo}`
     : `#${ticket.ticketNo}`;
 
   return (

@@ -146,6 +146,7 @@ export async function PATCH(
         createdBy: { select: { displayName: true } },
         assignedTo: { select: { displayName: true } },
         department: { select: { name: true } },
+        system: { select: { ticketPrefix: true } },
       },
     });
 
@@ -160,6 +161,45 @@ export async function PATCH(
           detail: auditDetails.join(", "),
         },
       });
+
+      // ส่ง LINE push notification ให้ผู้ติดตามตั๋ว (ยกเว้นคนแก้ไขเอง)
+      try {
+        const followers = await prisma.ticketFollower.findMany({
+          where: {
+            ticketId: params.id,
+            userId: { not: session.id },
+          },
+          include: {
+            user: { select: { lineUid: true } },
+          },
+        });
+
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: session.tenantId },
+          select: { lineOaToken: true },
+        });
+
+        if (followers.length > 0 && tenant?.lineOaToken) {
+          const ticketRef = updated.system?.ticketPrefix
+            ? `${updated.system.ticketPrefix}-${updated.ticketNo}`
+            : `#${updated.ticketNo}`;
+          const changeMsg = `📢 ${ticketRef} อัปเดต: ${auditDetails.join(", ")}`;
+
+          const { pushMessage } = await import("@/lib/line");
+          const uids = followers.map((f) => f.user.lineUid).filter(Boolean);
+          for (const uid of uids) {
+            try {
+              await pushMessage(tenant.lineOaToken, uid, [
+                { type: "text", text: changeMsg } as any,
+              ]);
+            } catch (err) {
+              console.error(`Failed to push notification to follower ${uid}:`, err);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error sending update notifications to followers:", err);
+      }
     }
 
     return NextResponse.json(updated);

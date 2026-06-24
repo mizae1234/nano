@@ -1,18 +1,20 @@
-// ─── น้องนาโน — Smart Command Router ─────────────────────────
-// รองรับภาษาธรรมชาติ, greeting, ticket creation, status check
+// ─── Smart Command Router ─────────────────────────
 
 import { Plan } from "@prisma/client";
 
-// Trigger words สำหรับ group chat
+// Trigger words for group chat
 const TRIGGERS = ["นาโน", "@นาโน", "nano", "@nano"];
 
 export type NanoAction =
   | { action: "CREATE_TICKET"; text: string; systemCode?: string }
+  | { action: "ASSIGN_NOTE"; assigneeName: string; text: string; systemCode?: string }
   | { action: "LIST_TICKETS"; systemCode?: string }
   | { action: "CHECK_STATUS"; ticketNo: string; systemPrefix?: string }
+  | { action: "FOLLOW_TICKET"; ticketNo: string; systemPrefix?: string }
   | { action: "SHOW_SYSTEMS" }
   | { action: "GREETING" }
   | { action: "SHOW_MENU" }
+  | { action: "GROUP_SUMMARY"; systemCode?: string }
   | { action: "GEMINI_QUERY"; query: string }
   | { action: "UPGRADE_REQUIRED" }
   | null;
@@ -21,21 +23,21 @@ export type NanoAction =
 const GREETING_WORDS = ["สวัสดี", "หวัดดี", "ดีจ้า", "ดีครับ", "ดีค่ะ", "hi", "hello", "hey", "yo"];
 const MENU_WORDS = ["เมนู", "menu", "help", "ช่วย", "ทำอะไรได้", "ใช้ยังไง", "วิธีใช้", "คำสั่ง"];
 const SYSTEMS_WORDS = ["ระบบอะไรบ้าง", "มีระบบ", "ระบบที่รองรับ", "แจ้งระบบ", "แจ้งได้กี่ระบบ", "ระบบอะไร"];
-const LIST_TICKET_WORDS = ["ดูตั๋ว", "ตั๋วของฉัน", "ticket ของฉัน", "ติดตามตั๋ว", "งานของฉัน"];
+const LIST_TICKET_WORDS = ["ดูตั๋ว", "ตั๋วของฉัน", "ticket ของฉัน", "ติดตามตั๋ว", "งานของฉัน", "ดูงาน", "list งาน", "list งานทั้งหมด", "งานทั้งหมด"];
 const STATUS_WORDS = ["สถานะ", "status", "ตรวจสอบ"];
 const CREATE_WORDS = ["แจ้ง", "แจ้งปัญหา", "report", "สร้าง ticket", "สร้างตั๋ว", "ขอแจ้ง"];
+const NOTE_WORDS = ["note", "โน้ต", "บันทึก"];
+const FOLLOW_WORDS = ["ติดตาม", "follow", "แจ้งเตือน"];
+const SUMMARY_WORDS = ["สรุป", "summary", "สรุปงาน", "สถิติ", "stats"];
 
 /**
- * แยก system code จากข้อความ
- * รองรับ: [hris], HRIS, HRS, hris
+ * Extract system code from message
  */
 function extractSystemCode(text: string): { systemCode?: string; cleanText: string } {
-  // [code] format
   const bracketMatch = text.match(/\[([a-zA-Z0-9_-]+)\]/);
   if (bracketMatch) {
     return { systemCode: bracketMatch[1].toLowerCase(), cleanText: text.replace(bracketMatch[0], "").trim() };
   }
-  // CODE ข้อความ เช่น "HRIS คอมค้าง" หรือ "HRS-001 ปัญหา"
   const codeFirst = text.match(/^([A-Z]{2,8})\s+(.+)/i);
   if (codeFirst) {
     return { systemCode: codeFirst[1].toLowerCase(), cleanText: codeFirst[2].trim() };
@@ -43,17 +45,11 @@ function extractSystemCode(text: string): { systemCode?: string; cleanText: stri
   return { cleanText: text };
 }
 
-/**
- * ตรวจสอบว่าข้อความ include keyword ใดๆ จาก list
- */
 function includes(text: string, keywords: string[]): boolean {
   const lower = text.toLowerCase();
   return keywords.some((kw) => lower.includes(kw.toLowerCase()));
 }
 
-/**
- * ตรวจสอบว่าข้อความ startsWith keyword ใดๆ จาก list
- */
 function startsWith(text: string, keywords: string[]): { match: boolean; keyword: string } {
   const lower = text.toLowerCase();
   for (const kw of keywords) {
@@ -63,17 +59,7 @@ function startsWith(text: string, keywords: string[]): { match: boolean; keyword
 }
 
 /**
- * วิเคราะห์ข้อความจาก LINE แล้วแปลงเป็น NanoAction
- *
- * Priority:
- * 1. แจ้ง / แจ้งปัญหา → CREATE_TICKET
- * 2. ดูตั๋ว / ตั๋วของฉัน → LIST_TICKETS
- * 3. สถานะ → CHECK_STATUS
- * 4. ระบบมีอะไรบ้าง → SHOW_SYSTEMS
- * 5. สวัสดี / greeting → GREETING
- * 6. เมนู / help → SHOW_MENU
- * 7. PRO/ENTERPRISE → GEMINI_QUERY
- * 8. อื่นๆ → SHOW_MENU
+ * Parse LINE message into NanoAction
  */
 export function parseNanoCommand(
   message: string,
@@ -82,33 +68,53 @@ export function parseNanoCommand(
 ): NanoAction {
   let text = message.trim();
 
-  // ─── Group/Room: ต้องมี trigger word ──────────────────────
+  // Group/Room: require trigger word
   if (sourceType !== "user") {
     const trigger = TRIGGERS.find((t) => text.toLowerCase().startsWith(t.toLowerCase()));
     if (!trigger) return null;
     text = text.slice(trigger.length).trim();
   }
 
-  // ถ้าไม่มีข้อความหลัง trigger → แสดงเมนู
   if (!text) return { action: "SHOW_MENU" };
+
+  // ─── 0. Note / Assign Task ────────────────────────────────
+  const noteCheck = startsWith(text, NOTE_WORDS);
+  if (noteCheck.match) {
+    const afterCommand = text.slice(noteCheck.keyword.length).trim();
+    const mentionMatch = afterCommand.match(/@([^\s]+)/);
+    if (mentionMatch) {
+      const assigneeName = mentionMatch[1];
+      const remainingText = afterCommand.replace(mentionMatch[0], "").trim();
+      const { systemCode, cleanText } = extractSystemCode(remainingText);
+      return { action: "ASSIGN_NOTE", assigneeName, text: cleanText, systemCode };
+    }
+    return { action: "SHOW_MENU" };
+  }
 
   // ─── 1. แจ้ง / แจ้งปัญหา ──────────────────────────────────
   const createCheck = startsWith(text, CREATE_WORDS);
   if (createCheck.match) {
     const afterCommand = text.slice(createCheck.keyword.length).trim();
-    if (!afterCommand) {
-      // พิมพ์แค่ "แจ้ง" → ให้เลือกระบบก่อน
-      return { action: "SHOW_SYSTEMS" };
-    }
+    if (!afterCommand) return { action: "SHOW_SYSTEMS" };
     const { systemCode, cleanText } = extractSystemCode(afterCommand);
-    if (!cleanText) {
-      // มี system code แต่ไม่มีรายละเอียด → ให้เลือกระบบก่อน
-      return { action: "SHOW_SYSTEMS" };
-    }
+    if (!cleanText) return { action: "SHOW_SYSTEMS" };
     return { action: "CREATE_TICKET", text: cleanText, systemCode };
   }
 
-  // ─── 2. ดูตั๋ว / ตั๋วของฉัน ───────────────────────────────
+  // ─── 2. ติดตาม ────────────────────────────────────────────
+  const followCheck = startsWith(text, FOLLOW_WORDS);
+  if (followCheck.match) {
+    const afterCommand = text.slice(followCheck.keyword.length).trim();
+    const prefixMatch = afterCommand.match(/^#?([A-Z]{2,6})-(\d+)$/i);
+    if (prefixMatch) {
+      return { action: "FOLLOW_TICKET", ticketNo: prefixMatch[2], systemPrefix: prefixMatch[1].toUpperCase() };
+    }
+    const numMatch = afterCommand.match(/^#?(\d+)/);
+    if (numMatch) return { action: "FOLLOW_TICKET", ticketNo: numMatch[1] };
+    return { action: "SHOW_MENU" };
+  }
+
+  // ─── 3. ดูตั๋ว / ตั๋วของฉัน ───────────────────────────────
   const listCheck = startsWith(text, LIST_TICKET_WORDS);
   if (listCheck.match) {
     const afterCommand = text.slice(listCheck.keyword.length).trim();
@@ -116,7 +122,7 @@ export function parseNanoCommand(
     return { action: "LIST_TICKETS", systemCode };
   }
 
-  // ─── 3. สถานะ ─────────────────────────────────────────────
+  // ─── 4. สถานะ ─────────────────────────────────────────────
   const statusCheck = startsWith(text, STATUS_WORDS);
   if (statusCheck.match) {
     const afterCommand = text.slice(statusCheck.keyword.length).trim();
@@ -129,13 +135,19 @@ export function parseNanoCommand(
     return { action: "SHOW_MENU" };
   }
 
-  // ─── 4. ถามเรื่องระบบ ─────────────────────────────────────
+  // ─── 5. สรุปงาน ───────────────────────────────────────────
+  if (includes(text, SUMMARY_WORDS)) {
+    const { systemCode } = extractSystemCode(text);
+    return { action: "GROUP_SUMMARY", systemCode };
+  }
+
+  // ─── 6. ระบบ ──────────────────────────────────────────────
   if (includes(text, SYSTEMS_WORDS)) return { action: "SHOW_SYSTEMS" };
 
-  // ─── 5. Greeting ──────────────────────────────────────────
+  // ─── 7. Greeting ──────────────────────────────────────────
   if (includes(text, GREETING_WORDS)) return { action: "GREETING" };
 
-  // ─── 6. เมนู / Help ───────────────────────────────────────
+  // ─── 8. เมนู / Help ───────────────────────────────────────
   if (includes(text, MENU_WORDS)) return { action: "SHOW_MENU" };
 
   // ─── ทุก plan: ส่งให้ Gemini AI จัดการ ──────────────────────

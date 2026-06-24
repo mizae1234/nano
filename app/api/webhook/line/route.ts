@@ -4,15 +4,79 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { validateLineSignature, replyMessage } from "@/lib/line";
 import { parseNanoCommand } from "@/lib/nano-router";
+import { queryDatabase } from "@/lib/gemini";
 import {
   menuFlex,
+  groupMenuFlex,
   ticketCreatedFlex,
   ticketListFlex,
   ticketStatusFlex,
   welcomeFlex,
   upgradeRequiredFlex,
   systemSelectFlex,
+  followTicketFlex,
+  groupSummaryFlex,
 } from "@/lib/nano-reply";
+
+/**
+ * Helper to parse Thai and relative due dates from text
+ */
+function parseDueDate(text: string): Date | null {
+  const now = new Date();
+  const lowerText = text.toLowerCase().trim();
+
+  // 1. วันนี้ (Today) -> end of day today (23:59:59)
+  if (lowerText.includes("วันนี้") || lowerText.includes("ภายในวันนี้")) {
+    const d = new Date(now);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }
+
+  // 2. พรุ่งนี้ (Tomorrow) -> tomorrow (23:59:59)
+  if (lowerText.includes("พรุ่งนี้") || lowerText.includes("ภายในพรุ่งนี้")) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }
+
+  // 3. มะรืน (Day after tomorrow) -> day after tomorrow
+  if (lowerText.includes("มะรืน") || lowerText.includes("มะรืนนี้")) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 2);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }
+
+  // 4. อาทิตย์หน้า / สัปดาห์หน้า (Next week) -> +7 days
+  if (lowerText.includes("อาทิตย์หน้า") || lowerText.includes("สัปดาห์หน้า")) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 7);
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }
+
+  // 5. สิ้นเดือน (End of month)
+  if (lowerText.includes("สิ้นเดือน") || lowerText.includes("สิ้นเดือนนี้")) {
+    const d = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+    d.setHours(23, 59, 59, 999);
+    return d;
+  }
+
+  // 6. ภายใน X วัน / X วัน / ใน X วัน (Within X days) -> e.g. "เสร็จใน 3 วัน", "3 วัน"
+  const daysMatch = lowerText.match(/(?:ภายใน|อีก|ใน)?\s*(\d+)\s*วัน/);
+  if (daysMatch) {
+    const days = parseInt(daysMatch[1], 10);
+    if (!isNaN(days)) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + days);
+      d.setHours(23, 59, 59, 999);
+      return d;
+    }
+  }
+
+  return null;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,6 +113,43 @@ export async function POST(request: NextRequest) {
     const welcomeMsg = botConfigRow?.welcomeMessage;
     const menuMsg = botConfigRow?.menuMessage;
 
+    // Helper: reply and log to database
+    const replyAndLog = async (
+      oaToken: string,
+      replyToken: string,
+      messages: any[],
+      lineUid: string,
+      lineGroupId: string | null,
+      replyAction?: string
+    ) => {
+      // 1. ส่ง reply ไป LINE
+      await replyMessage(oaToken, replyToken, messages);
+
+      // 2. บันทึก ChatLog (OUTGOING)
+      for (const msg of messages) {
+        let textContent = "";
+        if (msg.type === "text") {
+          textContent = msg.text || "";
+        } else if (msg.type === "flex") {
+          textContent = `[Flex Message] ${msg.altText || ""}`;
+        }
+
+        await prisma.chatLog.create({
+          data: {
+            tenantId: tenant.id,
+            lineUid,
+            displayName: botMeta.botName || "น้องนาโน",
+            lineGroupId,
+            messageText: textContent,
+            direction: "OUTGOING",
+            replyAction: replyAction || "REPLY",
+          },
+        }).catch((err) => {
+          console.error("Failed to write OUTGOING chat log:", err);
+        });
+      }
+    };
+
     // ตรวจสอบ signature
     if (signature && !validateLineSignature(body, signature, tenant.lineOaSecret)) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
@@ -60,9 +161,16 @@ export async function POST(request: NextRequest) {
     for (const event of events) {
       if (event.type === "follow") {
         // ผู้ใช้เพิ่มเพื่อน
-        await replyMessage(tenant.lineOaToken, event.replyToken, [
-          welcomeFlex(event.source.userId || "ผู้ใช้", tenant.name, botMeta, welcomeMsg) as never,
-        ]);
+        const followUid = event.source.userId || "";
+        const followGroupId = event.source.groupId || null;
+        await replyAndLog(
+          tenant.lineOaToken,
+          event.replyToken,
+          [welcomeFlex(followUid || "ผู้ใช้", tenant.name, botMeta, welcomeMsg) as never],
+          followUid,
+          followGroupId,
+          "WELCOME"
+        );
         continue;
       }
 
@@ -70,7 +178,7 @@ export async function POST(request: NextRequest) {
 
       const sourceType = event.source.type as "user" | "group" | "room";
       const messageText = event.message.text;
-      const lineUid = event.source.userId;
+      const lineUid = event.source.userId || "";
       const lineGroupId = event.source.groupId || null;
 
       // วิเคราะห์คำสั่ง
@@ -82,21 +190,37 @@ export async function POST(request: NextRequest) {
         where: { tenantId: tenant.id, lineUid },
       });
 
-      const liffUrl = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}`;
+      // ─── บันทึก ChatLog (INCOMING) ──────────────────────────
+      await prisma.chatLog.create({
+        data: {
+          tenantId: tenant.id,
+          lineUid,
+          displayName: user?.displayName || null,
+          lineGroupId,
+          messageText,
+          direction: "INCOMING",
+          replyAction: action.action,
+        },
+      }).catch(() => {}); // ไม่ให้ error ทำให้ webhook ล้ม
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nano.technomand-ai.cloud';
+
+      // Helper: wrapper to reply using context variables
+      const reply = async (messages: any[], oaToken = tenant.lineOaToken!) => {
+        await replyAndLog(oaToken, event.replyToken, messages, lineUid, lineGroupId, action.action);
+      };
 
       // ─── Resolve System ───────────────────────────────────
       // 1. ถ้ามี systemCode จากข้อความ → ใช้เลย
       // 2. ถ้ามาจาก Group ที่ผูก 1 system → ใช้อัตโนมัติ
       // 3. ถ้าไม่รู้ → ถามด้วย Flex Message
       const resolveSystem = async (systemCode?: string) => {
-        // ถ้ามี code → หาจาก code
         if (systemCode) {
           return prisma.system.findFirst({
             where: { tenantId: tenant!.id, code: systemCode, isActive: true },
           });
         }
 
-        // ถ้ามาจาก group → ดู GroupConfig
         if (lineGroupId) {
           const groupConfig = await prisma.groupConfig.findFirst({
             where: { tenantId: tenant!.id, lineGroupId, isActive: true },
@@ -112,14 +236,12 @@ export async function POST(request: NextRequest) {
               .filter((gs) => gs.system.isActive)
               .map((gs) => gs.system);
 
-            // Group ผูก 1 system → ใช้เลย
             if (activeSystems.length === 1) {
               return activeSystems[0];
             }
           }
         }
 
-        // ไม่รู้ → return null (ต้องถามผู้ใช้)
         return null;
       };
 
@@ -131,7 +253,6 @@ export async function POST(request: NextRequest) {
         });
       };
 
-      // ─── Helper: resolve LINE OA token ────────────────────
       // ใช้ OA ของ System ถ้ามี, ถ้าไม่มี fallback ไปใช้ของ Tenant
       const getOaToken = (system?: { lineOaToken: string | null } | null) => {
         if (system?.lineOaToken) return system.lineOaToken;
@@ -141,7 +262,7 @@ export async function POST(request: NextRequest) {
       switch (action.action) {
         case "GREETING": {
           const name = botMeta.botName || "น้องนาโน";
-          await replyMessage(tenant.lineOaToken, event.replyToken, [
+          await reply([
             {
               type: "text",
               text: `สวัสดีค่ะ 👋 ยินดีให้บริการ\n\n${name} พร้อมช่วยแจ้งปัญหา ดูสถานะ ticket หรือถามข้อมูลต่างๆ\n\nพิมพ์ "เมนู" เพื่อดูคำสั่งทั้งหมดค่ะ`,
@@ -153,11 +274,11 @@ export async function POST(request: NextRequest) {
         case "SHOW_SYSTEMS": {
           const systems = await getTenantSystems();
           if (systems.length === 0) {
-            await replyMessage(tenant.lineOaToken, event.replyToken, [
+            await reply([
               { type: "text", text: "ยังไม่มีระบบที่ตั้งค่าไว้ค่ะ กรุณาติดต่อผู้ดูแลระบบ" } as never,
             ]);
           } else {
-            await replyMessage(tenant.lineOaToken, event.replyToken, [
+            await reply([
               systemSelectFlex(
                 systems.map((s) => ({ id: s.id, code: s.code, name: s.name, icon: s.icon, color: s.color })),
                 "แจ้ง",
@@ -168,22 +289,44 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        case "SHOW_MENU":
-          await replyMessage(tenant.lineOaToken, event.replyToken, [
-            menuFlex(tenant.plan, botMeta, menuMsg) as never,
-          ]);
+        case "SHOW_MENU": {
+          if (sourceType !== "user") {
+            let systemName: string | undefined;
+            if (lineGroupId) {
+              const groupConfig = await prisma.groupConfig.findFirst({
+                where: { tenantId: tenant.id, lineGroupId, isActive: true },
+                include: {
+                  groupSystems: {
+                    include: { system: true },
+                  },
+                },
+              });
+              if (groupConfig) {
+                const activeSystems = groupConfig.groupSystems
+                  .filter((gs) => gs.system.isActive)
+                  .map((gs) => gs.system);
+                if (activeSystems.length === 1) {
+                  systemName = activeSystems[0].name;
+                }
+              }
+            }
+            await reply([groupMenuFlex(tenant.plan, systemName, botMeta) as never]);
+          } else {
+            await reply([menuFlex(tenant.plan, botMeta, menuMsg) as never]);
+          }
           break;
+        }
 
-        case "CREATE_TICKET":
+        case "CREATE_TICKET": {
           if (!user) {
-            await replyMessage(tenant.lineOaToken, event.replyToken, [
+            await reply([
               { type: "text", text: "กรุณาลงทะเบียนผ่าน LIFF ก่อนค่ะ" } as never,
             ]);
             break;
           }
 
           if (!action.text) {
-            await replyMessage(tenant.lineOaToken, event.replyToken, [
+            await reply([
               {
                 type: "text",
                 text: 'กรุณาพิมพ์ "แจ้งปัญหา [ชื่อระบบ] รายละเอียด" ค่ะ\nตัวอย่าง: แจ้งปัญหา [hris] ระบบลาไม่ทำงาน',
@@ -192,18 +335,16 @@ export async function POST(request: NextRequest) {
             break;
           }
 
-          // Resolve system
           const system = await resolveSystem(action.systemCode);
 
           if (!system) {
-            // ไม่รู้ระบบ → ถามด้วย Flex Message
             const systems = await getTenantSystems();
             if (systems.length === 0) {
-              await replyMessage(tenant.lineOaToken, event.replyToken, [
+              await reply([
                 { type: "text", text: "ยังไม่มีระบบในองค์กร กรุณาติดต่อ Admin ค่ะ" } as never,
               ]);
             } else {
-              await replyMessage(tenant.lineOaToken, event.replyToken, [
+              await reply([
                 systemSelectFlex(
                   systems.map((s) => ({ id: s.id, code: s.code, name: s.name, icon: s.icon, color: s.color })),
                   "แจ้ง",
@@ -214,7 +355,6 @@ export async function POST(request: NextRequest) {
             break;
           }
 
-          // สร้าง ticket พร้อม system — ticket number per system
           const lastTicket = await prisma.ticket.findFirst({
             where: { tenantId: tenant.id, systemId: system.id },
             orderBy: { ticketNo: "desc" },
@@ -238,7 +378,6 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          // Audit log
           await prisma.auditLog.create({
             data: {
               tenantId: tenant.id,
@@ -250,7 +389,7 @@ export async function POST(request: NextRequest) {
           });
 
           const oaToken = getOaToken(system);
-          await replyMessage(oaToken, event.replyToken, [
+          await reply([
             ticketCreatedFlex(
               {
                 ticketNo: ticket.ticketNo,
@@ -264,24 +403,147 @@ export async function POST(request: NextRequest) {
                 systemPrefix: ticket.system?.ticketPrefix,
                 createdAt: ticket.createdAt.toLocaleDateString("th-TH"),
               },
-              `${liffUrl}/ticket/${ticket.id}`,
+              `${appUrl}/ticket/${ticket.id}`,
               botMeta
             ) as never,
-          ]);
+          ], oaToken);
           break;
+        }
 
-        case "LIST_TICKETS":
+        case "ASSIGN_NOTE": {
+          if (!user) {
+            await reply([
+              { type: "text", text: "กรุณาลงทะเบียนผ่าน LIFF ก่อนค่ะ" } as never,
+            ]);
+            break;
+          }
+
+          const system = await resolveSystem(action.systemCode);
+          if (!system) {
+            const systems = await getTenantSystems();
+            if (systems.length === 0) {
+              await reply([
+                { type: "text", text: "ยังไม่มีระบบในองค์กร กรุณาติดต่อ Admin ค่ะ" } as never,
+              ]);
+            } else {
+              await reply([
+                systemSelectFlex(
+                  systems.map((s) => ({ id: s.id, code: s.code, name: s.name, icon: s.icon, color: s.color })),
+                  "โน้ต",
+                  botMeta
+                ) as never,
+              ]);
+            }
+            break;
+          }
+
+          // ค้นหาผู้รับผิดชอบตาม displayName
+          const assignedUser = await prisma.user.findFirst({
+            where: {
+              tenantId: tenant.id,
+              displayName: {
+                contains: action.assigneeName,
+                mode: "insensitive",
+              },
+              isActive: true,
+            },
+          });
+
+          // วิเคราะห์ Due Date
+          const dueDate = parseDueDate(action.text);
+
+          const lastTicket = await prisma.ticket.findFirst({
+            where: { tenantId: tenant.id, systemId: system.id },
+            orderBy: { ticketNo: "desc" },
+          });
+          const nextNo = (lastTicket?.ticketNo || 0) + 1;
+
+          const ticket = await prisma.ticket.create({
+            data: {
+              tenantId: tenant.id,
+              ticketNo: nextNo,
+              title: action.text.substring(0, 100),
+              description: action.text,
+              createdById: user.id,
+              departmentId: user.departmentId,
+              systemId: system.id,
+              assignedToId: assignedUser?.id || system.defaultAssigneeId,
+              dueDate: dueDate,
+            },
+            include: {
+              department: { select: { name: true } },
+              system: { select: { name: true, icon: true, ticketPrefix: true } },
+              assignedTo: { select: { displayName: true } },
+            },
+          });
+
+          await prisma.auditLog.create({
+            data: {
+              tenantId: tenant.id,
+              ticketId: ticket.id,
+              userId: user.id,
+              action: "CREATED",
+              detail: `สร้าง Ticket ${system.ticketPrefix}-${ticket.ticketNo} จาก note assign ให้ ${ticket.assignedTo?.displayName || "Default"} dueDate ${dueDate?.toLocaleDateString("th-TH") || "none"}`,
+            },
+          });
+
+          const ticketRef = system.ticketPrefix ? `#${system.ticketPrefix}-${ticket.ticketNo}` : `#${ticket.ticketNo}`;
+          let replyText = `✅ บันทึกและเปิด Ticket ${ticketRef} เรียบร้อยค่ะ`;
+          if (assignedUser) {
+            replyText += `\n👤 ผู้รับผิดชอบ: ${assignedUser.displayName}`;
+          } else {
+            replyText += `\n⚠️ ไม่พบผู้รับผิดชอบชื่อ @${action.assigneeName} (มอบหมายให้ผู้ดูแลระบบแทน)`;
+          }
+          if (dueDate) {
+            replyText += `\n📅 กำหนดเสร็จ: ${dueDate.toLocaleDateString("th-TH")}`;
+          }
+
+          const oaToken = getOaToken(system);
+          await reply([
+            { type: "text", text: replyText } as never,
+            ticketCreatedFlex(
+              {
+                ticketNo: ticket.ticketNo,
+                title: ticket.title,
+                status: ticket.status,
+                priority: ticket.priority,
+                ticketType: ticket.ticketType,
+                departmentName: ticket.department?.name,
+                systemName: ticket.system?.name,
+                systemIcon: ticket.system?.icon || undefined,
+                systemPrefix: ticket.system?.ticketPrefix,
+                createdAt: ticket.createdAt.toLocaleDateString("th-TH"),
+              },
+              `${appUrl}/ticket/${ticket.id}`,
+              botMeta
+            ) as never,
+          ], oaToken);
+          break;
+        }
+
+        case "LIST_TICKETS": {
           if (!user) break;
 
-          // ถ้ามี systemCode → filter ตาม system
           const listSystem = action.systemCode
             ? await resolveSystem(action.systemCode)
             : null;
 
-          const ticketWhere: Record<string, unknown> = {
+          const ticketWhere: Record<string, any> = {
             tenantId: tenant.id,
-            createdById: user.id,
           };
+
+          // Role-based logic
+          if (user.role === "USER") {
+            ticketWhere.createdById = user.id;
+          } else if (user.role === "IT") {
+            ticketWhere.OR = [
+              { createdById: user.id },
+              { assignedToId: user.id },
+            ];
+          } else if (user.role === "DEPT_ADMIN" && user.departmentId) {
+            ticketWhere.departmentId = user.departmentId;
+          }
+
           if (listSystem) ticketWhere.systemId = listSystem.id;
 
           const tickets = await prisma.ticket.findMany({
@@ -289,12 +551,13 @@ export async function POST(request: NextRequest) {
             include: {
               department: { select: { name: true } },
               system: { select: { name: true, icon: true, ticketPrefix: true } },
+              createdBy: { select: { displayName: true } },
             },
             orderBy: { createdAt: "desc" },
             take: 10,
           });
 
-          await replyMessage(tenant.lineOaToken, event.replyToken, [
+          await reply([
             ticketListFlex(
               tickets.map((t) => ({
                 ticketNo: t.ticketNo,
@@ -303,24 +566,25 @@ export async function POST(request: NextRequest) {
                 priority: t.priority,
                 ticketType: t.ticketType,
                 departmentName: t.department?.name,
+                createdByName: t.createdBy?.displayName,
                 systemName: t.system?.name,
                 systemIcon: t.system?.icon || undefined,
                 systemPrefix: t.system?.ticketPrefix,
                 createdAt: t.createdAt.toLocaleDateString("th-TH"),
               })),
-              liffUrl,
+              appUrl,
               botMeta
             ) as never,
           ]);
           break;
+        }
 
-        case "CHECK_STATUS":
-          const statusWhere: Record<string, unknown> = {
+        case "CHECK_STATUS": {
+          const statusWhere: Record<string, any> = {
             tenantId: tenant.id,
             ticketNo: parseInt(action.ticketNo),
           };
 
-          // ถ้ามี prefix → filter ตาม system
           if (action.systemPrefix) {
             const prefixSystem = await prisma.system.findFirst({
               where: {
@@ -345,11 +609,11 @@ export async function POST(request: NextRequest) {
             const displayNo = action.systemPrefix
               ? `${action.systemPrefix}-${action.ticketNo}`
               : `#${action.ticketNo}`;
-            await replyMessage(tenant.lineOaToken, event.replyToken, [
+            await reply([
               { type: "text", text: `ไม่พบ Ticket ${displayNo} ค่ะ` } as never,
             ]);
           } else {
-            await replyMessage(tenant.lineOaToken, event.replyToken, [
+            await reply([
               ticketStatusFlex(
                 {
                   ticketNo: foundTicket.ticketNo,
@@ -369,21 +633,171 @@ export async function POST(request: NextRequest) {
             ]);
           }
           break;
+        }
 
-        case "GEMINI_QUERY":
-          await replyMessage(tenant.lineOaToken, event.replyToken, [
-            {
-              type: "text",
-              text: "🔍 น้องนาโนกำลังค้นหาข้อมูลให้ค่ะ กรุณารอสักครู่...",
-            } as never,
-          ]);
-          break;
+        case "FOLLOW_TICKET": {
+          if (!user) {
+            await reply([
+              { type: "text", text: "กรุณาลงทะเบียนผ่าน LIFF ก่อนค่ะ" } as never,
+            ]);
+            break;
+          }
 
-        case "UPGRADE_REQUIRED":
-          await replyMessage(tenant.lineOaToken, event.replyToken, [
-            upgradeRequiredFlex(tenant.plan, botMeta) as never,
-          ]);
+          const targetWhere: Record<string, any> = {
+            tenantId: tenant.id,
+            ticketNo: parseInt(action.ticketNo),
+          };
+
+          if (action.systemPrefix) {
+            const prefixSystem = await prisma.system.findFirst({
+              where: {
+                tenantId: tenant.id,
+                ticketPrefix: action.systemPrefix,
+                isActive: true,
+              },
+            });
+            if (prefixSystem) targetWhere.systemId = prefixSystem.id;
+          }
+
+          const targetTicket = await prisma.ticket.findFirst({
+            where: targetWhere,
+            include: {
+              system: { select: { ticketPrefix: true } },
+            },
+          });
+
+          if (!targetTicket) {
+            const displayNo = action.systemPrefix
+              ? `${action.systemPrefix}-${action.ticketNo}`
+              : `#${action.ticketNo}`;
+            await reply([
+              { type: "text", text: `ไม่พบ Ticket ${displayNo} ค่ะ` } as never,
+            ]);
+            break;
+          }
+
+          const ticketRef = targetTicket.system?.ticketPrefix
+            ? `${targetTicket.system.ticketPrefix}-${targetTicket.ticketNo}`
+            : `#${targetTicket.ticketNo}`;
+
+          const existingFollow = await prisma.ticketFollower.findUnique({
+            where: {
+              ticketId_userId: {
+                ticketId: targetTicket.id,
+                userId: user.id,
+              },
+            },
+          });
+
+          let isFollowing = false;
+          if (existingFollow) {
+            await prisma.ticketFollower.delete({
+              where: { id: existingFollow.id },
+            });
+          } else {
+            await prisma.ticketFollower.create({
+              data: {
+                ticketId: targetTicket.id,
+                userId: user.id,
+              },
+            });
+            isFollowing = true;
+          }
+
+          await reply([followTicketFlex(ticketRef, isFollowing, botMeta) as never]);
           break;
+        }
+
+        case "GROUP_SUMMARY": {
+          let targetSystemId: string | undefined;
+          let systemName: string | undefined;
+
+          if (action.systemCode) {
+            const sys = await resolveSystem(action.systemCode);
+            if (sys) {
+              targetSystemId = sys.id;
+              systemName = sys.name;
+            }
+          } else if (lineGroupId) {
+            const groupConfig = await prisma.groupConfig.findFirst({
+              where: { tenantId: tenant.id, lineGroupId, isActive: true },
+              include: {
+                groupSystems: {
+                  include: { system: true },
+                },
+              },
+            });
+            if (groupConfig) {
+              const activeSystems = groupConfig.groupSystems
+                .filter((gs) => gs.system.isActive)
+                .map((gs) => gs.system);
+              if (activeSystems.length === 1) {
+                targetSystemId = activeSystems[0].id;
+                systemName = activeSystems[0].name;
+              }
+            }
+          }
+
+          const statsWhere: Record<string, any> = {
+            tenantId: tenant.id,
+          };
+          if (targetSystemId) {
+            statsWhere.systemId = targetSystemId;
+          }
+
+          const tickets = await prisma.ticket.findMany({
+            where: statsWhere,
+            select: { status: true },
+          });
+
+          const stats = {
+            open: 0,
+            inProgress: 0,
+            pending: 0,
+            resolved: 0,
+            closed: 0,
+            total: tickets.length,
+          };
+
+          tickets.forEach((t) => {
+            if (t.status === "OPEN") stats.open++;
+            else if (t.status === "IN_PROGRESS") stats.inProgress++;
+            else if (t.status === "PENDING") stats.pending++;
+            else if (t.status === "RESOLVED") stats.resolved++;
+            else if (t.status === "CLOSED") stats.closed++;
+          });
+
+          await reply([groupSummaryFlex(stats, systemName, botMeta) as never]);
+          break;
+        }
+
+        case "GEMINI_QUERY": {
+          if (!user) {
+            await reply([
+              { type: "text", text: "กรุณาลงทะเบียนผ่าน LIFF ก่อนถามข้อมูลค่ะ" } as never,
+            ]);
+            break;
+          }
+
+          const answer = await queryDatabase(action.query, {
+            tenantId: tenant.id,
+            userId: user.id,
+            departmentId: user.departmentId,
+            userRole: user.role,
+            botName: botMeta.botName,
+            botPersona: botMeta.botPersona,
+            systemPrompt: botConfigRow?.systemPrompt,
+            aiModel: botConfigRow?.aiModel,
+          });
+
+          await reply([{ type: "text", text: answer } as never]);
+          break;
+        }
+
+        case "UPGRADE_REQUIRED": {
+          await reply([upgradeRequiredFlex(tenant.plan, botMeta) as never]);
+          break;
+        }
       }
     }
 

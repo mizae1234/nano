@@ -80,6 +80,48 @@ export async function POST(
       },
     });
 
+    // ส่ง LINE push notification ให้ผู้ติดตามตั๋ว (ยกเว้นคนคอมเมนต์เอง)
+    try {
+      const followers = await prisma.ticketFollower.findMany({
+        where: {
+          ticketId: params.id,
+          userId: { not: session.id },
+        },
+        include: {
+          user: { select: { lineUid: true } },
+        },
+      });
+
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: session.tenantId },
+        select: { lineOaToken: true },
+      });
+
+      if (followers.length > 0 && tenant?.lineOaToken) {
+        const system = ticket.systemId ? await prisma.system.findUnique({
+          where: { id: ticket.systemId },
+          select: { ticketPrefix: true },
+        }) : null;
+        
+        const ticketRef = system?.ticketPrefix ? `${system.ticketPrefix}-${ticket.ticketNo}` : `#${ticket.ticketNo}`;
+        const notifyMsg = `📢 ${ticketRef} มีความคิดเห็นใหม่จากคุณ ${comment.user.displayName}:\n"${comment.message.substring(0, 50)}${comment.message.length > 50 ? "..." : ""}"`;
+        
+        const { pushMessage } = await import("@/lib/line");
+        const uids = followers.map((f) => f.user.lineUid).filter(Boolean);
+        for (const uid of uids) {
+          try {
+            await pushMessage(tenant.lineOaToken, uid, [
+              { type: "text", text: notifyMsg } as any,
+            ]);
+          } catch (err) {
+            console.error(`Failed to push comment notification to follower ${uid}:`, err);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error sending comment notifications to followers:", err);
+    }
+
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {
     console.error("POST comment error:", error);

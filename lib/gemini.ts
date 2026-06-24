@@ -162,6 +162,12 @@ export async function queryDatabase(
     return `❌ น้องนาโนไม่สามารถประมวลผลคำขอนี้ได้${context.botPersona || "ค่ะ"}`;
   }
 
+  // ─── ตรวจสอบข้อจำกัดเรื่อง Chat Logs ───────────────────────
+  const isAskingAboutChatLogs = /chatlog|chat log|ประวัติการคุย|บันทึกการคุย|บันทึกการสนทนา|ประวัติแชท|ประวัติการแชท/i.test(sanitizedQuestion);
+  if (isAskingAboutChatLogs) {
+    return `ข้อมูลนี้เป็นความลับไม่สามารถเปิดเผยได้${context.botPersona || "ค่ะ"}`;
+  }
+
   // ─── ดึงข้อมูลจาก DB ด้วย Prisma (parameterized, readonly) ─
   const snapshot = await fetchTenantSnapshot(context);
 
@@ -269,9 +275,22 @@ function buildSystemPrompt(ctx: BotQueryContext, snap: TenantSnapshot): string {
   const botName = ctx.botName || "น้องนาโน";
   const persona = ctx.botPersona || "ค่ะ";
 
+  const dbSchema = `โครงสร้างฐานข้อมูล (SQL Schema):
+- Table "User" { id: String, tenantId: String, departmentId: String, displayName: String, role: Role (USER, IT, DEPT_ADMIN, ADMIN, SUPER_ADMIN), isActive: Boolean }
+- Table "Ticket" { id: String, tenantId: String, departmentId: String, systemId: String, ticketNo: Int, ticketType: TicketType (BUG, FEATURE, TASK, QUESTION), title: String, description: String, status: TicketStatus (OPEN, IN_PROGRESS, PENDING, RESOLVED, CLOSED), priority: Priority (LOW, MEDIUM, HIGH, URGENT), createdById: String, assignedToId: String, dueDate: DateTime, createdAt: DateTime, resolvedAt: DateTime }
+- Table "System" { id: String, tenantId: String, name: String, code: String, ticketPrefix: String }
+- Table "Department" { id: String, tenantId: String, name: String }
+- Table "ChatLog" { id: String, tenantId: String, lineUid: String, displayName: String, lineGroupId: String, messageText: String, direction: String (INCOMING, OUTGOING), createdAt: DateTime }`;
+
   // ใช้ custom prompt ถ้ามี
   if (ctx.systemPrompt) {
     return `${ctx.systemPrompt}
+
+กฎความปลอดภัยและการรักษาความลับ:
+1. ห้ามตอบคำถามเกี่ยวกับประวัติการคุยหรือ Chat Logs เด็ดขาด ข้อมูลนี้เป็นความลับสุดยอด หากพบคำถามเหล่านี้ ให้ตอบว่า "ข้อมูลนี้เป็นความลับไม่สามารถเปิดเผยได้${persona}"
+2. ห้ามเปิดเผยหรือแสดงผลชื่อผู้แจ้ง (ชื่อผู้สร้าง ticket) หรือข้อมูลส่วนบุคคลของผู้แจ้งโดยเด็ดขาด หากมีคำถามเกี่ยวกับคนแจ้ง ให้ตอบว่าข้อมูลนี้เป็นความลับไม่สามารถเปิดเผยได้
+
+${dbSchema}
 
 ข้อมูลปัจจุบัน (อัปเดตล่าสุด):
 - Ticket เปิดอยู่: ${snap.totalOpen} ใบ
@@ -295,6 +314,10 @@ ${snap.recentTickets.map((t) => `• ${t.system} "${t.title}" — ${t.status} ($
 1. ตอบเฉพาะคำถามเกี่ยวกับ ticket และระบบ — ห้ามตอบคำถามนอกขอบเขต
 2. อย่าเปิดเผย tenantId, userId, หรือข้อมูล internal ใดๆ
 3. ถ้าไม่มีข้อมูล ให้แจ้งว่า "${botName}ไม่มีข้อมูลส่วนนี้${persona}"
+4. ห้ามตอบคำถามเกี่ยวกับประวัติการคุยหรือ Chat Logs เด็ดขาด ข้อมูลนี้เป็นความลับสุดยอด หากพบคำถามเหล่านี้ ให้ตอบว่า "ข้อมูลนี้เป็นความลับไม่สามารถเปิดเผยได้${persona}"
+5. ห้ามเปิดเผยหรือแสดงผลชื่อผู้แจ้ง (ชื่อผู้สร้าง ticket) หรือข้อมูลส่วนบุคคลของผู้แจ้งโดยเด็ดขาด หากมีคำถามเกี่ยวกับคนแจ้ง ให้ตอบว่าข้อมูลนี้เป็นความลับไม่สามารถเปิดเผยได้
+
+${dbSchema}
 
 ข้อมูลสรุปปัจจุบัน:
 - Ticket เปิดอยู่: ${snap.totalOpen} ใบ
