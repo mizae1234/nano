@@ -1,7 +1,7 @@
 // ─── น้องนาโน — Systems API ──────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { hasMinRole } from "@/lib/tenant";
 import { Role } from "@prisma/client";
@@ -9,13 +9,13 @@ import { Role } from "@prisma/client";
 // GET /api/systems — ดึงรายการ system ของ tenant
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
     const systems = await prisma.system.findMany({
-      where: { tenantId: session.user.tenantId },
+      where: { tenantId: session.tenantId },
       include: {
         defaultAssignee: { select: { id: true, displayName: true, pictureUrl: true } },
         _count: {
@@ -63,12 +63,12 @@ export async function GET() {
 // POST /api/systems — สร้าง system ใหม่
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    if (!hasMinRole(session.user.role as Role, "ADMIN")) {
+    if (!hasMinRole(session.role as Role, "ADMIN")) {
       return NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 });
     }
 
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     // ตรวจสอบ code ซ้ำ
     const existing = await prisma.system.findFirst({
-      where: { tenantId: session.user.tenantId, code: code.toLowerCase() },
+      where: { tenantId: session.tenantId, code: code.toLowerCase() },
     });
     if (existing) {
       return NextResponse.json(
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     // ตรวจสอบ ticketPrefix ซ้ำ
     const existingPrefix = await prisma.system.findFirst({
-      where: { tenantId: session.user.tenantId, ticketPrefix: ticketPrefix.toUpperCase() },
+      where: { tenantId: session.tenantId, ticketPrefix: ticketPrefix.toUpperCase() },
     });
     if (existingPrefix) {
       return NextResponse.json(
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     const system = await prisma.system.create({
       data: {
-        tenantId: session.user.tenantId,
+        tenantId: session.tenantId,
         code: code.toLowerCase(),
         name,
         description: description || null,

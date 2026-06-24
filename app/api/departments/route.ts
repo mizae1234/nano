@@ -1,7 +1,7 @@
 // ─── น้องนาโน — Departments API ──────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { hasMinRole } from "@/lib/tenant";
 import { checkLimit } from "@/lib/plan-limits";
@@ -10,13 +10,13 @@ import { Role } from "@prisma/client";
 // GET /api/departments
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
     const departments = await prisma.department.findMany({
-      where: { tenantId: session.user.tenantId },
+      where: { tenantId: session.tenantId },
       include: {
         _count: {
           select: {
@@ -38,16 +38,16 @@ export async function GET() {
 // POST /api/departments
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    if (!hasMinRole(session.user.role as Role, "ADMIN")) {
+    if (!hasMinRole(session.role as Role, "ADMIN")) {
       return NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 });
     }
 
-    const { tenantId, tenantPlan } = session.user;
+    const { tenantId, tenantPlan } = session;
 
     // ตรวจสอบ limit
     const deptCount = await prisma.department.count({ where: { tenantId } });

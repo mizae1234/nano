@@ -1,7 +1,7 @@
 // ─── น้องนาโน — Tickets API ──────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { getTicketWhereByRole } from "@/lib/tenant";
 import { checkLimit } from "@/lib/plan-limits";
@@ -10,12 +10,12 @@ import { Role } from "@prisma/client";
 // GET /api/tickets — ดึงรายการ ticket ตาม role
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    const { tenantId, role, id: userId, departmentId } = session.user;
+    const { tenantId, role, id: userId, departmentId } = session;
 
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get("status");
@@ -80,12 +80,12 @@ export async function GET(request: NextRequest) {
 // POST /api/tickets — สร้าง ticket ใหม่
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    const { tenantId, tenantPlan, id: userId } = session.user;
+    const { tenantId, tenantPlan, id: userId } = session;
     const body = await request.json();
 
     // ตรวจสอบ plan limit

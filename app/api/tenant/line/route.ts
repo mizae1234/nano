@@ -1,7 +1,9 @@
 // ─── น้องนาโน — LINE OA Connection API ──────────────────────
 
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { hasMinRole } from "@/lib/tenant";
 import { encrypt } from "@/lib/encrypt";
@@ -11,12 +13,12 @@ import { Role } from "@prisma/client";
 // POST /api/tenant/line — เชื่อมต่อ LINE OA
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    if (!hasMinRole(session.user.role as Role, "SUPER_ADMIN")) {
+    if (!hasMinRole(session.role as Role, "SUPER_ADMIN")) {
       return NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 });
     }
 
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
     const encryptedSecret = encrypt(channelSecret);
 
     await prisma.tenant.update({
-      where: { id: session.user.tenantId },
+      where: { id: session.tenantId },
       data: {
         lineOaToken: encryptedToken,
         lineOaSecret: encryptedSecret,

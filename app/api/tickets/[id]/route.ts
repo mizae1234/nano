@@ -1,7 +1,7 @@
 // ─── น้องนาโน — Ticket Detail API ────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { canAccessTicket, hasMinRole } from "@/lib/tenant";
 import { Role } from "@prisma/client";
@@ -12,13 +12,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
     const ticket = await prisma.ticket.findFirst({
-      where: { id: params.id, tenantId: session.user.tenantId },
+      where: { id: params.id, tenantId: session.tenantId },
       include: {
         createdBy: { select: { id: true, displayName: true, pictureUrl: true } },
         assignedTo: { select: { id: true, displayName: true, pictureUrl: true } },
@@ -47,9 +47,9 @@ export async function GET(
     // ตรวจสอบสิทธิ์
     if (
       !canAccessTicket(
-        session.user.role as Role,
-        session.user.id,
-        session.user.departmentId,
+        session.role as Role,
+        session.id,
+        session.departmentId,
         ticket
       )
     ) {
@@ -75,13 +75,13 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
     const ticket = await prisma.ticket.findFirst({
-      where: { id: params.id, tenantId: session.user.tenantId },
+      where: { id: params.id, tenantId: session.tenantId },
     });
 
     if (!ticket) {
@@ -89,7 +89,7 @@ export async function PATCH(
     }
 
     // ต้องเป็น IT ขึ้นไปถึงจะแก้ไข ticket ได้
-    if (!hasMinRole(session.user.role as Role, "IT")) {
+    if (!hasMinRole(session.role as Role, "IT")) {
       return NextResponse.json(
         { error: "ไม่มีสิทธิ์แก้ไข Ticket" },
         { status: 403 }
@@ -153,9 +153,9 @@ export async function PATCH(
     if (auditDetails.length > 0) {
       await prisma.auditLog.create({
         data: {
-          tenantId: session.user.tenantId,
+          tenantId: session.tenantId,
           ticketId: params.id,
-          userId: session.user.id,
+          userId: session.id,
           action: "UPDATED",
           detail: auditDetails.join(", "),
         },

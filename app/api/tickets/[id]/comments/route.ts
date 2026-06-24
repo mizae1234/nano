@@ -1,7 +1,7 @@
 // ─── น้องนาโน — Comments API ─────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 
 // GET /api/tickets/[id]/comments
@@ -10,15 +10,15 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
     const comments = await prisma.ticketComment.findMany({
       where: {
         ticketId: params.id,
-        ticket: { tenantId: session.user.tenantId },
+        ticket: { tenantId: session.tenantId },
       },
       include: {
         user: { select: { displayName: true, pictureUrl: true, role: true } },
@@ -39,8 +39,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
@@ -51,7 +51,7 @@ export async function POST(
 
     // ตรวจสอบว่า ticket อยู่ใน tenant เดียวกัน
     const ticket = await prisma.ticket.findFirst({
-      where: { id: params.id, tenantId: session.user.tenantId },
+      where: { id: params.id, tenantId: session.tenantId },
     });
 
     if (!ticket) {
@@ -61,7 +61,7 @@ export async function POST(
     const comment = await prisma.ticketComment.create({
       data: {
         ticketId: params.id,
-        userId: session.user.id,
+        userId: session.id,
         message: body.message.trim(),
       },
       include: {
@@ -72,9 +72,9 @@ export async function POST(
     // Audit log
     await prisma.auditLog.create({
       data: {
-        tenantId: session.user.tenantId,
+        tenantId: session.tenantId,
         ticketId: params.id,
-        userId: session.user.id,
+        userId: session.id,
         action: "COMMENTED",
         detail: body.message.trim().substring(0, 100),
       },

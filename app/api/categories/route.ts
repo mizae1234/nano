@@ -1,7 +1,7 @@
 // ─── น้องนาโน — Categories API ────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { hasMinRole } from "@/lib/tenant";
 import { Role } from "@prisma/client";
@@ -9,12 +9,12 @@ import { Role } from "@prisma/client";
 // GET /api/categories — ดึงรายการ category ของ tenant
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    const { tenantId } = session.user;
+    const { tenantId } = session;
     const searchParams = request.nextUrl.searchParams;
     const departmentId = searchParams.get("departmentId");
 
@@ -54,12 +54,12 @@ export async function GET(request: NextRequest) {
 // POST /api/categories — สร้าง category ใหม่
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    if (!hasMinRole(session.user.role as Role, "ADMIN")) {
+    if (!hasMinRole(session.role as Role, "ADMIN")) {
       return NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 });
     }
 
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     // ตรวจสอบชื่อซ้ำภายใต้ tenant & department เดียวกัน
     const existing = await prisma.category.findFirst({
       where: {
-        tenantId: session.user.tenantId,
+        tenantId: session.tenantId,
         departmentId: departmentId || null,
         name: { equals: name, mode: "insensitive" },
       },
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     const category = await prisma.category.create({
       data: {
-        tenantId: session.user.tenantId,
+        tenantId: session.tenantId,
         name,
         departmentId: departmentId || null,
       },

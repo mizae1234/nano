@@ -1,7 +1,7 @@
 // ─── น้องนาโน — Migration API ────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { hasMinRole } from "@/lib/tenant";
 import { migrateTenantToDedicatedDb, testDedicatedDbConnection } from "@/lib/migrate";
@@ -10,17 +10,17 @@ import { Role } from "@prisma/client";
 // GET /api/tenant/migrate — ดูสถานะ migration
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
     const log = await prisma.migrationLog.findUnique({
-      where: { tenantId: session.user.tenantId },
+      where: { tenantId: session.tenantId },
     });
 
     const tenant = await prisma.tenant.findUnique({
-      where: { id: session.user.tenantId },
+      where: { id: session.tenantId },
       select: { dbMode: true, plan: true },
     });
 
@@ -34,16 +34,16 @@ export async function GET() {
 // POST /api/tenant/migrate — เริ่ม migration หรือทดสอบ
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    if (!hasMinRole(session.user.role as Role, "SUPER_ADMIN")) {
+    if (!hasMinRole(session.role as Role, "SUPER_ADMIN")) {
       return NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 });
     }
 
-    if (session.user.tenantPlan !== "ENTERPRISE") {
+    if (session.tenantPlan !== "ENTERPRISE") {
       return NextResponse.json(
         { error: "ฟีเจอร์ Dedicated Database ใช้งานได้เฉพาะแผน Enterprise" },
         { status: 403 }
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     // เริ่ม migration แบบ background (return 202 ทันที)
-    migrateTenantToDedicatedDb(session.user.tenantId, dedicatedDbUrl).catch(
+    migrateTenantToDedicatedDb(session.tenantId, dedicatedDbUrl).catch(
       (error) => {
         console.error("Background migration error:", error);
       }

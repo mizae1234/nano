@@ -1,7 +1,7 @@
 // ─── น้องนาโน — User Role API ────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { hasMinRole } from "@/lib/tenant";
 import { Role } from "@prisma/client";
@@ -12,12 +12,12 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    if (!hasMinRole(session.user.role as Role, "ADMIN")) {
+    if (!hasMinRole(session.role as Role, "ADMIN")) {
       return NextResponse.json({ error: "ไม่มีสิทธิ์เปลี่ยน Role" }, { status: 403 });
     }
 
@@ -25,7 +25,7 @@ export async function PATCH(
     const newRole = body.role as Role;
 
     // ห้ามตั้ง SUPER_ADMIN ถ้าตัวเองไม่ใช่ SUPER_ADMIN
-    if (newRole === "SUPER_ADMIN" && session.user.role !== "SUPER_ADMIN") {
+    if (newRole === "SUPER_ADMIN" && session.role !== "SUPER_ADMIN") {
       return NextResponse.json(
         { error: "เฉพาะผู้ดูแลสูงสุดเท่านั้นที่สามารถตั้งค่า SUPER_ADMIN ได้" },
         { status: 403 }
@@ -33,7 +33,7 @@ export async function PATCH(
     }
 
     const user = await prisma.user.update({
-      where: { id: params.id, tenantId: session.user.tenantId },
+      where: { id: params.id, tenantId: session.tenantId },
       data: { role: newRole },
     });
 

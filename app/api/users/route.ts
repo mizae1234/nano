@@ -1,7 +1,7 @@
 // ─── น้องนาโน — Users API ────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { hasMinRole } from "@/lib/tenant";
 import { checkLimit } from "@/lib/plan-limits";
@@ -10,20 +10,20 @@ import { Role } from "@prisma/client";
 // GET /api/users
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    if (!hasMinRole(session.user.role as Role, "DEPT_ADMIN")) {
+    if (!hasMinRole(session.role as Role, "DEPT_ADMIN")) {
       return NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 });
     }
 
-    const where: Record<string, unknown> = { tenantId: session.user.tenantId };
+    const where: Record<string, unknown> = { tenantId: session.tenantId };
 
     // DEPT_ADMIN เห็นเฉพาะคนในแผนกตัวเอง
-    if (session.user.role === "DEPT_ADMIN" && session.user.departmentId) {
-      where.departmentId = session.user.departmentId;
+    if (session.role === "DEPT_ADMIN" && session.departmentId) {
+      where.departmentId = session.departmentId;
     }
 
     const users = await prisma.user.findMany({
@@ -45,16 +45,16 @@ export async function GET() {
 // POST /api/users — เชิญผู้ใช้ใหม่ (จะถูกสร้างจริงตอน LINE login)
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    if (!hasMinRole(session.user.role as Role, "ADMIN")) {
+    if (!hasMinRole(session.role as Role, "ADMIN")) {
       return NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 });
     }
 
-    const { tenantId, tenantPlan } = session.user;
+    const { tenantId, tenantPlan } = session;
 
     // ตรวจสอบ limit
     const userCount = await prisma.user.count({ where: { tenantId } });

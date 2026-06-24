@@ -1,7 +1,7 @@
 // ─── น้องนาโน — Category Detail API ────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { hasMinRole } from "@/lib/tenant";
 import { Role } from "@prisma/client";
@@ -12,12 +12,12 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    if (!hasMinRole(session.user.role as Role, "ADMIN")) {
+    if (!hasMinRole(session.role as Role, "ADMIN")) {
       return NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 });
     }
 
@@ -43,7 +43,7 @@ export async function PATCH(
 
       const existing = await prisma.category.findFirst({
         where: {
-          tenantId: session.user.tenantId,
+          tenantId: session.tenantId,
           departmentId: departmentId !== undefined ? (departmentId || null) : category.departmentId,
           name: { equals: name, mode: "insensitive" },
           id: { not: params.id },
@@ -59,7 +59,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.category.update({
-      where: { id: params.id, tenantId: session.user.tenantId },
+      where: { id: params.id, tenantId: session.tenantId },
       data: updateData,
       include: {
         department: { select: { name: true } },
@@ -82,18 +82,18 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const session = await getNanoSession();
+    if (!session) {
       return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
     }
 
-    if (!hasMinRole(session.user.role as Role, "ADMIN")) {
+    if (!hasMinRole(session.role as Role, "ADMIN")) {
       return NextResponse.json({ error: "ไม่มีสิทธิ์" }, { status: 403 });
     }
 
     // ลบหมวดหมู่ (Prisma จะตั้งค่า categoryId ใน Ticket เป็น null อัตโนมัติเนื่องจากเป็น optional relation)
     await prisma.category.delete({
-      where: { id: params.id, tenantId: session.user.tenantId },
+      where: { id: params.id, tenantId: session.tenantId },
     });
 
     return NextResponse.json({ message: "ลบหมวดหมู่เรียบร้อยแล้ว" });
