@@ -176,7 +176,7 @@ export default function ProfilePage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="เช่น 68, 10023"
+                  placeholder="เช่น E001, 10023"
                   className="input-field"
                   value={employeeCode}
                   onChange={(e) => setEmployeeCode(e.target.value)}

@@ -99,7 +99,7 @@ export function menuFlex(plan: Plan, bot?: BotMeta, menuMessage?: string) {
           { type: "text", text: menuMessage || `เลือกสิ่งที่ต้องการ${botPersona} 😊`, size: "sm", color: "#333333", weight: "bold" },
           { type: "separator", margin: "sm" },
           { type: "text", text: "💬 แชทส่วนตัว (พิมพ์สั่งได้ทันที):", size: "xs", color: "#555555", weight: "bold", margin: "sm" },
-          { type: "text", text: "• ลงทะเบียน: ลงทะเบียน รหัสพนักงาน [รหัส] ชื่อ [ชื่อ] แผนก [แผนก]\n   เช่น: ลงทะเบียน รหัสพนักงาน 68 ชื่อ กนิษฐา แผนก IT", size: "xxs", color: "#666666", wrap: true },
+          { type: "text", text: "• ลงทะเบียน: ลงทะเบียน รหัสพนักงาน [รหัส] ชื่อ [ชื่อ] แผนก [แผนก]\n   เช่น: ลงทะเบียน รหัสพนักงาน E001 ชื่อ ดวงใจ แผนก IT", size: "xxs", color: "#666666", wrap: true },
           { type: "text", text: "• สร้างตั๋ว: แจ้ง [ระบบ] [รายละเอียด] (หรือระบุประเภทนำหน้า Bug / Feature / Task)\n   เช่น: Feature hris ขอรายงานคนลาออก", size: "xxs", color: "#666666", wrap: true },
           { type: "text", text: "• ขอลิงก์เว็บ: พิมพ์ \"ขอลิงก์ dashboard\" หรือ \"ขอลิงก์เปิด ticket\"", size: "xxs", color: "#666666", wrap: true },
           { type: "text", text: "• ดูตั๋วของคุณ: พิมพ์ \"ดูตั๋ว\"", size: "xxs", color: "#666666" },
