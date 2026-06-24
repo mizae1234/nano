@@ -11,7 +11,7 @@ import { Role } from "@prisma/client";
 // GET /api/bot/config — ดึง bot config ของ tenant
 export async function GET() {
   const session = await getNanoSession();
-  if (!session?.user) {
+  if (!session) {
     return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
   }
 
@@ -39,7 +39,7 @@ export async function GET() {
 // PUT /api/bot/config — บันทึก bot config
 export async function PUT(request: NextRequest) {
   const session = await getNanoSession();
-  if (!session?.user) {
+  if (!session) {
     return NextResponse.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
   }
 

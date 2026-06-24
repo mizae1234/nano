@@ -36,6 +36,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "ok" }); // ไม่ทำอะไร
     }
 
+    // ดึง bot config สำหรับ flex messages
+    const botConfigRow = await prisma.botConfig.findUnique({ where: { tenantId: tenant.id } });
+    const botMeta = {
+      botName: botConfigRow?.botName,
+      botPersona: botConfigRow?.botPersona,
+      themeColor: botConfigRow?.themeColor || tenant.themeColor,
+    };
+    const welcomeMsg = botConfigRow?.welcomeMessage;
+    const menuMsg = botConfigRow?.menuMessage;
+
     // ตรวจสอบ signature
     if (signature && !validateLineSignature(body, signature, tenant.lineOaSecret)) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
@@ -48,7 +58,7 @@ export async function POST(request: NextRequest) {
       if (event.type === "follow") {
         // ผู้ใช้เพิ่มเพื่อน
         await replyMessage(tenant.lineOaToken, event.replyToken, [
-          welcomeFlex(event.source.userId || "ผู้ใช้", tenant.name, tenant.themeColor) as never,
+          welcomeFlex(event.source.userId || "ผู้ใช้", tenant.name, botMeta, welcomeMsg) as never,
         ]);
         continue;
       }
@@ -128,7 +138,7 @@ export async function POST(request: NextRequest) {
       switch (action.action) {
         case "SHOW_MENU":
           await replyMessage(tenant.lineOaToken, event.replyToken, [
-            menuFlex(tenant.plan, tenant.themeColor) as never,
+            menuFlex(tenant.plan, botMeta, menuMsg) as never,
           ]);
           break;
 
@@ -164,8 +174,8 @@ export async function POST(request: NextRequest) {
               await replyMessage(tenant.lineOaToken, event.replyToken, [
                 systemSelectFlex(
                   systems.map((s) => ({ id: s.id, code: s.code, name: s.name, icon: s.icon, color: s.color })),
-                  "แจ้งปัญหา",
-                  tenant.themeColor
+                  "แจ้ง",
+                  botMeta
                 ) as never,
               ]);
             }
@@ -223,7 +233,7 @@ export async function POST(request: NextRequest) {
                 createdAt: ticket.createdAt.toLocaleDateString("th-TH"),
               },
               `${liffUrl}/ticket/${ticket.id}`,
-              tenant.themeColor
+              botMeta
             ) as never,
           ]);
           break;
@@ -267,7 +277,7 @@ export async function POST(request: NextRequest) {
                 createdAt: t.createdAt.toLocaleDateString("th-TH"),
               })),
               liffUrl,
-              tenant.themeColor
+              botMeta
             ) as never,
           ]);
           break;
@@ -322,7 +332,7 @@ export async function POST(request: NextRequest) {
                   systemPrefix: foundTicket.system?.ticketPrefix,
                   createdAt: foundTicket.createdAt.toLocaleDateString("th-TH"),
                 },
-                tenant.themeColor
+                botMeta
               ) as never,
             ]);
           }
@@ -339,7 +349,7 @@ export async function POST(request: NextRequest) {
 
         case "UPGRADE_REQUIRED":
           await replyMessage(tenant.lineOaToken, event.replyToken, [
-            upgradeRequiredFlex(tenant.plan, tenant.themeColor) as never,
+            upgradeRequiredFlex(tenant.plan, botMeta) as never,
           ]);
           break;
       }

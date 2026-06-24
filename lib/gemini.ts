@@ -11,8 +11,14 @@ const ALLOWED_STATUS = ["OPEN", "IN_PROGRESS", "PENDING", "RESOLVED", "CLOSED"];
 const ALLOWED_PRIORITY = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 const ALLOWED_TICKET_TYPE = ["BUG", "FEATURE", "TASK", "QUESTION"];
 
+// ─── Block SQL injection keywords ────────────────────────────────────
+const SQL_INJECT_KEYWORDS = ["union", "select *", "drop ", "insert ", "update ", "delete ", "exec(", "execute(", "xp_cmd"];
+function containsSqlInjection(text: string): boolean {
+  const lower = text.toLowerCase();
+  return SQL_INJECT_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
 // ─── Block อักขระอันตรายใน free-text input ──────────────────
-const DANGEROUS_PATTERN = /['";\\--\/\*xX0-9].*[oO][rR]|[uU][nN][iI][oO][nN]|[sS][eE][lL][eE][cC][tT]\s+\*/;
 
 export interface BotQueryContext {
   tenantId: string;
@@ -152,7 +158,7 @@ export async function queryDatabase(
     .replace(/[<>{}[\]\\]/g, "")
     .substring(0, 300);
 
-  if (DANGEROUS_PATTERN.test(sanitizedQuestion)) {
+  if (containsSqlInjection(sanitizedQuestion)) {
     return `❌ น้องนาโนไม่สามารถประมวลผลคำขอนี้ได้${context.botPersona || "ค่ะ"}`;
   }
 
