@@ -425,7 +425,7 @@ export default function AdminReportPage() {
           {activeTab === "details" && (
             <div className="flex flex-col gap-1 mt-auto">
               <button
-                onClick={handleExportCsv}
+                onClick={handleExportExcel}
                 disabled={exporting || refreshing}
                 className="btn-primary !bg-emerald-600 hover:!bg-emerald-700 flex items-center gap-2 text-sm py-2 px-4 h-10 shadow-sm"
               >
@@ -437,7 +437,7 @@ export default function AdminReportPage() {
                 ) : (
                   <>
                     <Download className="w-4 h-4" />
-                    ส่งออก Excel (CSV)
+                    ส่งออก Excel (.xlsx)
                   </>
                 )}
               </button>
