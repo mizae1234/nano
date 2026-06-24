@@ -23,6 +23,7 @@ import {
   Loader2,
   Server,
   MessageSquare,
+  Send,
 } from "lucide-react";
 
 interface UserSession {
@@ -53,6 +54,7 @@ const menuItems: MenuItem[] = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard, roles: ["ADMIN", "SUPER_ADMIN"] },
   { label: "จัดการระบบ", href: "/admin/systems", icon: Server, roles: ["ADMIN", "SUPER_ADMIN"] },
   { label: "จัดการ Group", href: "/admin/groups", icon: MessageSquare, roles: ["ADMIN", "SUPER_ADMIN"] },
+  { label: "Broadcast (ส่งข้อมูล)", href: "/admin/broadcast", icon: Send, roles: ["ADMIN", "SUPER_ADMIN"] },
   { label: "Chat Logs", href: "/admin/chatlogs", icon: MessageSquare, roles: ["SUPER_ADMIN"] },
   { label: "จัดการผู้ใช้", href: "/admin/users", icon: Users, roles: ["ADMIN", "SUPER_ADMIN"] },
   { label: "จัดการแผนก", href: "/admin/departments", icon: Building2, roles: ["ADMIN", "SUPER_ADMIN"] },
