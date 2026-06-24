@@ -462,6 +462,81 @@ export async function POST(request: NextRequest) {
           break;
         }
 
+        case "SHOW_DASHBOARD": {
+          if (!user) {
+            await reply([
+              { type: "text", text: "กรุณาลงทะเบียนผ่าน LIFF ก่อนค่ะ" } as never,
+            ]);
+            break;
+          }
+
+          let redirectPath = "/ticket";
+          if (user.role === "IT") {
+            redirectPath = "/it";
+          } else if (user.role === "DEPT_ADMIN") {
+            redirectPath = "/dept";
+          } else if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") {
+            redirectPath = "/admin";
+          }
+
+          const dashboardUrl = `${appUrl}/login?redirect=${encodeURIComponent(redirectPath)}&tenant=${tenant.slug}`;
+          const { linkCardFlex } = await import("@/lib/nano-reply");
+
+          if (sourceType === "user") {
+            await reply([
+              linkCardFlex(
+                "📊 แดชบอร์ดของคุณ",
+                `สวัสดีค่ะ คุณ ${user.displayName} คุณสามารถกดปุ่มด้านล่างนี้เพื่อเข้าสู่หน้าแดชบอร์ดส่วนตัวของคุณในระบบได้เลยค่ะ 😊`,
+                "เข้าสู่ Dashboard",
+                dashboardUrl,
+                botMeta
+              ) as never,
+            ]);
+          } else {
+            // Group chat: only send text reply, do not expose name card
+            await reply([
+              {
+                type: "text",
+                text: `🔒 เพื่อความเป็นส่วนตัวสูงสุดและสิทธิ์การเข้าถึงข้อมูล กรุณาเข้าสู่ระบบผ่านลิงก์ด้านล่าง เพื่อเข้าสู่แดชบอร์ดส่วนตัวของคุณค่ะ 😊\n🔗 เข้าสู่ Dashboard: ${dashboardUrl}`,
+              } as never,
+            ]);
+          }
+          break;
+        }
+
+        case "SHOW_CREATE_TICKET_LINK": {
+          if (!user) {
+            await reply([
+              { type: "text", text: "กรุณาลงทะเบียนผ่าน LIFF ก่อนค่ะ" } as never,
+            ]);
+            break;
+          }
+
+          const createTicketUrl = `${appUrl}/login?redirect=${encodeURIComponent("/ticket/new")}&tenant=${tenant.slug}`;
+          const { linkCardFlex } = await import("@/lib/nano-reply");
+
+          if (sourceType === "user") {
+            await reply([
+              linkCardFlex(
+                "📝 เปิด Ticket เอง",
+                `สวัสดีค่ะ คุณ ${user.displayName} คุณสามารถกดปุ่มด้านล่างนี้เพื่อเข้าสู่หน้าสร้าง Ticket ใหม่ได้ทันทีค่ะ 😊`,
+                "สร้าง Ticket ใหม่",
+                createTicketUrl,
+                botMeta
+              ) as never,
+            ]);
+          } else {
+            // Group chat
+            await reply([
+              {
+                type: "text",
+                text: `🔒 เพื่อความปลอดภัย กรุณาคลิกลิงก์ด้านล่างเพื่อเข้าสู่ระบบและสร้าง Ticket ในระบบด้วยตัวเองได้เลยค่ะ 😊\n🔗 เปิด Ticket ในระบบ: ${createTicketUrl}`,
+              } as never,
+            ]);
+          }
+          break;
+        }
+
         case "GREETING": {
           const name = botMeta.botName || "น้องนาโน";
           await reply([
@@ -599,6 +674,7 @@ export async function POST(request: NextRequest) {
               departmentId: user.departmentId,
               systemId: system.id,
               assignedToId: system.defaultAssigneeId,
+              ticketType: action.ticketType || "BUG",
             },
             include: {
               department: { select: { name: true } },

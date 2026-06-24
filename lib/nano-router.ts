@@ -1,12 +1,12 @@
 // ─── Smart Command Router ─────────────────────────
 
-import { Plan } from "@prisma/client";
+import { Plan, TicketType } from "@prisma/client";
 
 // Trigger words for group chat
 const TRIGGERS = ["นาโน", "@นาโน", "nano", "@nano"];
 
 export type NanoAction =
-  | { action: "CREATE_TICKET"; text: string; systemCode?: string }
+  | { action: "CREATE_TICKET"; text: string; systemCode?: string; ticketType?: TicketType }
   | { action: "ASSIGN_NOTE"; assigneeName: string; text: string; systemCode?: string }
   | { action: "LIST_TICKETS"; systemCode?: string }
   | { action: "CHECK_STATUS"; ticketNo: string; systemPrefix?: string }
@@ -19,6 +19,8 @@ export type NanoAction =
   | { action: "GEMINI_QUERY"; query: string }
   | { action: "UPGRADE_REQUIRED" }
   | { action: "REGISTER"; employeeCode: string; name: string; departmentName: string }
+  | { action: "SHOW_DASHBOARD" }
+  | { action: "SHOW_CREATE_TICKET_LINK" }
   | null;
 
 // ─── Keyword Banks ────────────────────────────────────────────
@@ -32,6 +34,19 @@ const CREATE_WORDS = ["แจ้ง", "แจ้งปัญหา", "report", "
 const NOTE_WORDS = ["note", "โน้ต", "บันทึก"];
 const FOLLOW_WORDS = ["ติดตาม", "follow", "แจ้งเตือน"];
 const SUMMARY_WORDS = ["สรุปเดือนนี้", "สรุป", "summary", "สรุปงาน", "สถิติ", "stats"];
+
+const BUG_WORDS = ["แจ้งปัญหา", "แจ้งบั๊ก", "แจ้งบัก", "บั๊ก", "บัก", "bug", "bugs", "ปัญหา"];
+const FEATURE_WORDS = ["ขอฟีเจอร์ใหม่", "ขอฟีเจอร์", "ฟีเจอร์", "feature", "features"];
+const TASK_WORDS = ["สั่งงาน", "มอบหมายงาน", "งาน", "task", "tasks"];
+const QUESTION_WORDS = ["สอบถาม", "คำถาม", "question", "questions", "ถาม"];
+
+const DASHBOARD_WORDS = ["ขอลิ้ง dashboard", "ขอลิงก์ แดชบอร์ด", "ขอ dashboard", "dashboard หน่อย", "ขอลิงก์แดชบอร์ด", "ขอลิ้งแดชบอร์ด", "ดูแดชบอร์ด", "แดชบอร์ด", "dashboard"];
+const CREATE_TICKET_LINK_WORDS = [
+  "ขอลิ้งเปิด ticket", "ขอลิงก์สร้างตั๋ว", "ขอลิ้งสร้าง ticket", "ขอลิงก์เปิดตั๋ว", 
+  "เปิดตั๋วเอง", "แจ้งปัญหาในเว็บ", "เข้าเว็บแจ้งปัญหา", "เปิด ticket เอง", 
+  "เปิดตั๋วในเว็บ", "ลิ้งสร้างตั๋ว", "ลิงก์สร้างตั๋ว", "ขอลิงก์เปิด ticket", "ขอลิ้งค์เปิด ticket",
+  "ขอลิ้งค์สร้างตั๋ว", "ขอลิ้งค์สร้าง ticket", "ขอลิ้งค์เปิดตั๋ว"
+];
 
 /**
  * Extract system code from message
@@ -86,6 +101,13 @@ export function parseNanoCommand(
         startsWith(text, STATUS_WORDS).match ||
         startsWith(text, CLOSE_WORDS).match ||
         startsWith(text, CREATE_WORDS).match ||
+        startsWith(text, BUG_WORDS).match ||
+        startsWith(text, FEATURE_WORDS).match ||
+        startsWith(text, TASK_WORDS).match ||
+        startsWith(text, QUESTION_WORDS).match ||
+        includes(text, DASHBOARD_WORDS) ||
+        includes(text, CREATE_TICKET_LINK_WORDS) ||
+        includes(text, ["ลิ้งเว็บ", "ลิงก์เว็บ", "เข้าเว็บ", "ดูในเว็บ", "ขอลิงก์", "ขอลิ้ง", "ขอลิ้งค์"]) ||
         includes(text, SUMMARY_WORDS) ||
         includes(text, ["ลงทะเบียน", "profile", "โปรไฟล์", "บัตรพนักงาน"]);
 
@@ -94,6 +116,17 @@ export function parseNanoCommand(
   }
 
   if (!text) return { action: "SHOW_MENU" };
+
+  // ─── 0.2. ขอลิงก์ Dashboard / เปิด Ticket ─────────────────
+  if (includes(text, DASHBOARD_WORDS)) {
+    return { action: "SHOW_DASHBOARD" };
+  }
+  if (includes(text, CREATE_TICKET_LINK_WORDS)) {
+    return { action: "SHOW_CREATE_TICKET_LINK" };
+  }
+  if (includes(text, ["ลิ้งเว็บ", "ลิงก์เว็บ", "เข้าเว็บ", "ดูในเว็บ", "ขอลิงก์", "ขอลิ้ง", "ขอลิ้งค์"])) {
+    return { action: "SHOW_DASHBOARD" };
+  }
 
   // ─── 0.1. ลงทะเบียน ───────────────────────────────────────
   const lowerText = text.toLowerCase();
@@ -129,6 +162,42 @@ export function parseNanoCommand(
       return { action: "ASSIGN_NOTE", assigneeName, text: cleanText, systemCode };
     }
     return { action: "SHOW_MENU" };
+  }
+
+  // ─── 0.3. Typed Create Ticket commands ───────────────────
+  let detectedType: TicketType | undefined = undefined;
+  let matchedKeyword = "";
+
+  const bugCheck = startsWith(text, BUG_WORDS);
+  const featureCheck = startsWith(text, FEATURE_WORDS);
+  const taskCheck = startsWith(text, TASK_WORDS);
+  const questionCheck = startsWith(text, QUESTION_WORDS);
+
+  if (featureCheck.match) {
+    detectedType = "FEATURE";
+    matchedKeyword = featureCheck.keyword;
+  } else if (bugCheck.match) {
+    detectedType = "BUG";
+    matchedKeyword = bugCheck.keyword;
+  } else if (taskCheck.match) {
+    detectedType = "TASK";
+    matchedKeyword = taskCheck.keyword;
+  } else if (questionCheck.match) {
+    detectedType = "QUESTION";
+    matchedKeyword = questionCheck.keyword;
+  }
+
+  if (detectedType) {
+    const afterCommand = text.slice(matchedKeyword.length).trim();
+    if (!afterCommand) return { action: "SHOW_SYSTEMS" };
+    const { systemCode, cleanText } = extractSystemCode(afterCommand);
+    if (!cleanText) {
+      if (systemCode) {
+        return { action: "CREATE_TICKET", text: "", systemCode, ticketType: detectedType };
+      }
+      return { action: "SHOW_SYSTEMS" };
+    }
+    return { action: "CREATE_TICKET", text: cleanText, systemCode, ticketType: detectedType };
   }
 
   // ─── 1. แจ้ง / แจ้งปัญหา ──────────────────────────────────

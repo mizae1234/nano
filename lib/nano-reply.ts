@@ -104,7 +104,8 @@ export function menuFlex(plan: Plan, bot?: BotMeta, menuMessage?: string) {
           { type: "separator", margin: "sm" },
           { type: "text", text: "💬 แชทส่วนตัว (พิมพ์สั่งได้ทันที):", size: "xs", color: "#555555", weight: "bold", margin: "sm" },
           { type: "text", text: "• ลงทะเบียน: ลงทะเบียน รหัสพนักงาน [รหัส] ชื่อ [ชื่อ] แผนก [แผนก]\n   เช่น: ลงทะเบียน รหัสพนักงาน 68 ชื่อ กนิษฐา แผนก IT", size: "xxs", color: "#666666", wrap: true },
-          { type: "text", text: "• สร้างตั๋ว: แจ้ง [ระบบ] [รายละเอียด]\n   เช่น: แจ้ง it คอมเปิดไม่ติด", size: "xxs", color: "#666666", wrap: true },
+          { type: "text", text: "• สร้างตั๋ว: แจ้ง [ระบบ] [รายละเอียด] (หรือระบุประเภทนำหน้า Bug / Feature / Task)\n   เช่น: Feature hris ขอรายงานคนลาออก", size: "xxs", color: "#666666", wrap: true },
+          { type: "text", text: "• ขอลิงก์เว็บ: พิมพ์ \"ขอลิงก์ dashboard\" หรือ \"ขอลิงก์เปิด ticket\"", size: "xxs", color: "#666666", wrap: true },
           { type: "text", text: "• ดูตั๋วของคุณ: พิมพ์ \"ดูตั๋ว\"", size: "xxs", color: "#666666" },
           { type: "text", text: "• เช็คสถานะ: พิมพ์ \"สถานะ #1\"", size: "xxs", color: "#666666" },
           ...(plan === "PRO" || plan === "ENTERPRISE" ? [{ type: "text" as const, text: "• ถาม AI: ถาม [คำถาม]\n   เช่น: ถาม มีตั๋วค้างกี่ใบ", size: "xxs" as const, color: "#666666" as const, wrap: true }] : []),
@@ -142,7 +143,8 @@ export function groupMenuFlex(plan: Plan, systemName?: string, bot?: BotMeta) {
           { type: "text", text: "👥 คุยกับน้องนาโนในกลุ่มไลน์:", size: "xs", color: "#333333", weight: "bold" },
           { type: "text", text: "ต้องพิมพ์ \"นาโน\" หรือ \"@นาโน\" นำหน้าคำสั่ง", size: "xxs", color: "#555555", wrap: true },
           { type: "separator", margin: "sm" },
-          { type: "text", text: "• สร้างตั๋ว: นาโน แจ้ง [รายละเอียด]\n   เช่น: นาโน แจ้ง แอร์เสีย", size: "xxs", color: "#666666", wrap: true },
+          { type: "text", text: "• สร้างตั๋ว: นาโน แจ้ง [รายละเอียด] (หรือนำหน้าด้วย Bug / Feature / Task เช่น \"นาโน Feature แอร์เสีย\")", size: "xxs", color: "#666666", wrap: true },
+          { type: "text", text: "• ขอลิงก์เว็บ: นาโน ขอลิงก์ dashboard", size: "xxs", color: "#666666", wrap: true },
           { type: "text", text: "• ดูตั๋วทั้งหมดในกลุ่ม: นาโน ดูตั๋ว", size: "xxs", color: "#666666" },
           { type: "text", text: "• สรุปงานในกลุ่ม: นาโน สรุป", size: "xxs", color: "#666666" },
           { type: "text", text: "• เช็คสถานะ: นาโน สถานะ #[หมายเลข]", size: "xxs", color: "#666666" },
@@ -921,6 +923,59 @@ export function profileCardFlex(
               type: "uri",
               label: "แก้ไขโปรไฟล์",
               uri: profileUrl,
+            },
+            style: "primary",
+            color: themeColor,
+            height: "sm",
+          },
+        ],
+      },
+    },
+  };
+}
+
+export function linkCardFlex(
+  title: string,
+  description: string,
+  linkLabel: string,
+  linkUrl: string,
+  bot?: BotMeta
+) {
+  const { botName, themeColor } = meta(bot);
+  return {
+    type: "flex",
+    altText: title,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: headerBox(title, themeColor, botName),
+      body: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "16px",
+        spacing: "sm",
+        contents: [
+          {
+            type: "text",
+            text: description,
+            size: "sm",
+            color: "#333333",
+            wrap: true,
+            lineSpacing: "4px"
+          }
+        ]
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "button",
+            action: {
+              type: "uri",
+              label: linkLabel,
+              uri: linkUrl,
             },
             style: "primary",
             color: themeColor,
