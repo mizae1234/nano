@@ -87,11 +87,7 @@ export function menuFlex(plan: Plan, bot?: BotMeta, menuMessage?: string) {
   const actions: object[] = [
     { type: "button", action: { type: "message", label: "📝 แจ้งปัญหา", text: "แจ้ง " }, style: "primary", color: themeColor, height: "sm" },
     { type: "button", action: { type: "message", label: "📋 ดูตั๋วของฉัน", text: "ดูตั๋ว" }, style: "secondary", height: "sm" },
-    { type: "button", action: { type: "message", label: "🔍 ตรวจสอบสถานะ", text: "สถานะ #" }, style: "secondary", height: "sm" },
   ];
-  if (plan === "PRO" || plan === "ENTERPRISE") {
-    actions.push({ type: "button", action: { type: "message", label: `🤖 ถาม${botName.replace("🤖 ", "")}`, text: "ถาม " }, style: "secondary", height: "sm" });
-  }
   return {
     type: "flex", altText: "เมนูหลัก",
     contents: {
