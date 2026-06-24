@@ -57,6 +57,12 @@ interface TicketDetail {
   system: { id: string; name: string; color: string; ticketPrefix: string } | null;
   comments: CommentItem[];
   auditLogs: AuditLogItem[];
+  notifyOnResolve: boolean;
+  notifyChannel: string;
+  notifyGroupId: string | null;
+  assignedToId?: string | null;
+  departmentId?: string | null;
+  categoryId?: string | null;
 }
 
 interface UserItem {
@@ -115,6 +121,7 @@ export default function TicketDetailPage() {
   const [departments, setDepartments] = useState<DeptItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [updating, setUpdating] = useState(false);
+  const [groups, setGroups] = useState<any[]>([]);
 
   useEffect(() => {
     loadSessionAndTicket();
@@ -151,6 +158,11 @@ export default function TicketDetailPage() {
           setCategories(catRes || []);
         }
       }
+
+      // โหลดรายชื่อกลุ่มไลน์เสมอ เพื่อนำมาเลือกเป็นช่องทางการแจ้งเตือน
+      const groupsRes = await fetch("/api/groups").then((r) => r.json()).catch(() => []);
+      setGroups(groupsRes.groups || groupsRes || []);
+
       setLoading(false);
     } catch (err) {
       console.error(err);
@@ -569,14 +581,84 @@ export default function TicketDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Notification Settings */}
+          <div className="card space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900">ตั้งค่าการแจ้งเตือน</h3>
+            
+            {/* Notify on Resolve Toggle */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-550">แจ้งเตือนเมื่อแก้ไขแล้ว</span>
+              {(isIT || sessionUser?.id === ticket.createdBy.id) ? (
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-nano-600 border-gray-300 rounded focus:ring-nano-500 cursor-pointer"
+                  checked={ticket.notifyOnResolve}
+                  onChange={(e) => handleUpdateField("notifyOnResolve", e.target.checked)}
+                  disabled={updating}
+                />
+              ) : (
+                <span className="text-xs font-semibold text-gray-700">
+                  {ticket.notifyOnResolve ? "เปิด" : "ปิด"}
+                </span>
+              )}
+            </div>
+
+            {ticket.notifyOnResolve && (
+              <>
+                {/* Notify Channel */}
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">ช่องทางแจ้งเตือน</div>
+                  {(isIT || sessionUser?.id === ticket.createdBy.id) ? (
+                    <select
+                      className="input-field text-sm !py-1"
+                      value={ticket.notifyChannel}
+                      onChange={(e) => handleUpdateField("notifyChannel", e.target.value)}
+                      disabled={updating}
+                    >
+                      <option value="DIRECT">LINE ส่วนตัวของผู้แจ้ง</option>
+                      <option value="GROUP">LINE Group</option>
+                      <option value="NONE">ไม่แจ้งเตือน</option>
+                    </select>
+                  ) : (
+                    <span className="text-sm text-gray-700">
+                      {ticket.notifyChannel === "DIRECT" && "LINE ส่วนตัวของผู้แจ้ง"}
+                      {ticket.notifyChannel === "GROUP" && "LINE Group"}
+                      {ticket.notifyChannel === "NONE" && "ไม่แจ้งเตือน"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Group Selection */}
+                {ticket.notifyChannel === "GROUP" && (
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">เลือกกลุ่มไลน์</div>
+                    {(isIT || sessionUser?.id === ticket.createdBy.id) ? (
+                      <select
+                        className="input-field text-sm !py-1"
+                        value={ticket.notifyGroupId || ""}
+                        onChange={(e) => handleUpdateField("notifyGroupId", e.target.value || null)}
+                        disabled={updating}
+                      >
+                        <option value="">-- เลือกกลุ่มไลน์ --</option>
+                        {groups.map((g) => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-sm text-gray-750">
+                        {groups.find((g) => g.id === ticket.notifyGroupId)?.name || "ไม่ได้ระบุกลุ่ม"}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 // Add custom field support for backward compatibility with schema
-interface TicketDetail {
-  assignedToId?: string | null;
-  departmentId?: string | null;
-  categoryId?: string | null;
-}
+// (Interface merged above)

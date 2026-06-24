@@ -96,10 +96,14 @@ export async function PATCH(
 
     if (!isIT) {
       const keys = Object.keys(body);
-      const isOnlyUpdatingStatusToClosed =
-        keys.length === 1 && keys[0] === "status" && body.status === "CLOSED";
+      // คีย์ที่ Creator สามารถแก้ไขได้: status (ต้องเป็น CLOSED เท่านั้น), notifyOnResolve, notifyChannel, notifyGroupId
+      const allowedKeysForCreator = ["status", "notifyOnResolve", "notifyChannel", "notifyGroupId"];
+      const hasOnlyAllowedKeys = keys.every((k) => allowedKeysForCreator.includes(k));
 
-      if (!isCreator || !isOnlyUpdatingStatusToClosed) {
+      // ตรวจสอบความถูกต้องของสิทธิ์การแก้สถานะ
+      const isStatusValid = !body.status || body.status === "CLOSED";
+
+      if (!isCreator || !hasOnlyAllowedKeys || !isStatusValid) {
         return NextResponse.json(
           { error: "ไม่มีสิทธิ์แก้ไข Ticket" },
           { status: 403 }
@@ -145,6 +149,21 @@ export async function PATCH(
       updateData.categoryId = body.categoryId;
     }
 
+    if (body.notifyOnResolve !== undefined && body.notifyOnResolve !== ticket.notifyOnResolve) {
+      updateData.notifyOnResolve = body.notifyOnResolve;
+      auditDetails.push(`เปลี่ยนการตั้งค่าแจ้งเตือนเมื่อแก้ไขแล้วเป็น ${body.notifyOnResolve ? "เปิด" : "ปิด"}`);
+    }
+
+    if (body.notifyChannel !== undefined && body.notifyChannel !== ticket.notifyChannel) {
+      updateData.notifyChannel = body.notifyChannel;
+      auditDetails.push(`เปลี่ยนช่องทางการแจ้งเตือนเป็น ${body.notifyChannel}`);
+    }
+
+    if (body.notifyGroupId !== undefined && body.notifyGroupId !== ticket.notifyGroupId) {
+      updateData.notifyGroupId = body.notifyGroupId;
+      auditDetails.push("เปลี่ยนกลุ่มแจ้งเตือน");
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "ไม่มีข้อมูลที่ต้องอัปเดต" }, { status: 400 });
     }
@@ -153,7 +172,7 @@ export async function PATCH(
       where: { id: params.id },
       data: updateData,
       include: {
-        createdBy: { select: { displayName: true } },
+        createdBy: { select: { displayName: true, lineUid: true } },
         assignedTo: { select: { displayName: true } },
         department: { select: { name: true } },
         system: { select: { ticketPrefix: true } },
@@ -205,6 +224,36 @@ export async function PATCH(
             } catch (err) {
               console.error(`Failed to push notification to follower ${uid}:`, err);
             }
+          }
+        }
+
+        // ส่ง LINE แจ้งเตือนเมื่อสถานะเปลี่ยนเป็น RESOLVED (แก้ไขแล้ว)
+        if (body.status === "RESOLVED" && updated.notifyOnResolve && tenant?.lineOaToken) {
+          try {
+            const ticketRef = updated.system?.ticketPrefix
+              ? `${updated.system.ticketPrefix}-${updated.ticketNo}`
+              : `#${updated.ticketNo}`;
+            const resolveMsg = `✅ ตั๋วงาน #${ticketRef} "${updated.title}" ได้รับการแก้ไขเรียบร้อยแล้วค่ะ`;
+
+            const { pushMessage } = await import("@/lib/line");
+
+            if (updated.notifyChannel === "DIRECT" && updated.createdBy.lineUid) {
+              await pushMessage(tenant.lineOaToken, updated.createdBy.lineUid, [
+                { type: "text", text: resolveMsg } as any,
+              ]);
+            } else if (updated.notifyChannel === "GROUP" && updated.notifyGroupId) {
+              const g = await prisma.groupConfig.findUnique({
+                where: { id: updated.notifyGroupId },
+                select: { lineGroupId: true }
+              });
+              if (g?.lineGroupId) {
+                await pushMessage(tenant.lineOaToken, g.lineGroupId, [
+                  { type: "text", text: resolveMsg } as any,
+                ]);
+              }
+            }
+          } catch (err) {
+            console.error("Error sending RESOLVED notification to creator/group:", err);
           }
         }
       } catch (err) {

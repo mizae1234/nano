@@ -246,6 +246,9 @@ model Ticket {
   assignedTo   User?        @relation("AssignedTo", fields: [assignedToId], references: [id])
   resolvedAt   DateTime?
   dueDate      DateTime?                      // วันที่คาดว่าจะเสร็จสิ้น
+  notifyOnResolve Boolean      @default(true)
+  notifyChannel   String       @default("DIRECT")
+  notifyGroupId   String?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 

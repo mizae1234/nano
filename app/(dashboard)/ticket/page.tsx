@@ -41,7 +41,13 @@ const PRIORITY_LABEL: Record<string, string> = {
   LOW: "ต่ำ", MEDIUM: "กลาง", HIGH: "สูง", URGENT: "ด่วน!",
 };
 
-function TicketCard({ ticket }: { ticket: TicketItem }) {
+function TicketCard({
+  ticket,
+  onDragStart,
+}: {
+  ticket: TicketItem;
+  onDragStart: (e: React.DragEvent, id: string) => void;
+}) {
   const ticketDisplay = ticket.system
     ? `${ticket.system.ticketPrefix}-${ticket.ticketNo}`
     : `#${ticket.ticketNo}`;
@@ -50,7 +56,9 @@ function TicketCard({ ticket }: { ticket: TicketItem }) {
   return (
     <Link
       href={`/ticket/${ticket.id}`}
-      className="block bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-3 group"
+      draggable
+      onDragStart={(e) => onDragStart(e, ticket.id)}
+      className="block bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-3 group cursor-grab active:cursor-grabbing"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -108,6 +116,8 @@ export default function MyTicketsPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
+  const [draggedTicketId, setDraggedTicketId] = useState<string | null>(null);
+  const [draggedOverCol, setDraggedOverCol] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/tickets?limit=200")
@@ -128,6 +138,58 @@ export default function MyTicketsPage() {
     open: tickets.filter((t) => t.status === "OPEN").length,
     inProgress: tickets.filter((t) => t.status === "IN_PROGRESS").length,
     resolved: tickets.filter((t) => t.status === "RESOLVED").length,
+  };
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedTicketId(id);
+    e.dataTransfer.setData("text/plain", id);
+  };
+
+  const handleDragOver = (e: React.DragEvent, status: string) => {
+    e.preventDefault();
+    if (draggedOverCol !== status) {
+      setDraggedOverCol(status);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    setDraggedOverCol(null);
+
+    const ticketId = draggedTicketId || e.dataTransfer.getData("text/plain");
+    if (!ticketId) return;
+
+    setDraggedTicketId(null);
+
+    const ticket = tickets.find((t) => t.id === ticketId);
+    if (!ticket || ticket.status === targetStatus) return;
+
+    const originalStatus = ticket.status;
+
+    // Optimistic UI Update
+    setTickets((prev) =>
+      prev.map((t) => (t.id === ticketId ? { ...t, status: targetStatus } : t))
+    );
+
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "ไม่สามารถย้ายตั๋วงานได้");
+      }
+    } catch (err: any) {
+      alert(err.message || "เกิดข้อผิดพลาดในการเปลี่ยนสถานะ");
+      // Rollback to original status
+      setTickets((prev) =>
+        prev.map((t) => (t.id === ticketId ? { ...t, status: originalStatus } : t))
+      );
+    }
   };
 
   if (loading) {
@@ -201,8 +263,13 @@ export default function MyTicketsPage() {
             return (
               <div
                 key={col.key}
-                className="flex-shrink-0 w-[260px] rounded-2xl flex flex-col"
+                className={`flex-shrink-0 w-[260px] rounded-2xl flex flex-col transition-all duration-200 ${
+                  draggedOverCol === col.key ? "ring-2 ring-nano-500 scale-[1.01] opacity-90 shadow-lg" : ""
+                }`}
                 style={{ scrollSnapAlign: "start", backgroundColor: col.bg, border: `1.5px solid ${col.border}` }}
+                onDragOver={(e) => handleDragOver(e, col.key)}
+                onDragLeave={() => setDraggedOverCol(null)}
+                onDrop={(e) => handleDrop(e, col.key)}
               >
                 {/* Column Header */}
                 <div className="flex items-center justify-between px-3 pt-3 pb-2">
@@ -223,7 +290,9 @@ export default function MyTicketsPage() {
                   {colTickets.length === 0 ? (
                     <div className="text-center py-8 text-xs text-gray-400">ไม่มี ticket</div>
                   ) : (
-                    colTickets.map((t) => <TicketCard key={t.id} ticket={t} />)
+                    colTickets.map((t) => (
+                      <TicketCard key={t.id} ticket={t} onDragStart={handleDragStart} />
+                    ))
                   )}
                 </div>
               </div>

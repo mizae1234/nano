@@ -9,7 +9,7 @@ interface ChatLogItem {
   displayName: string | null;
   lineGroupId: string | null;
   messageText: string | null;
-  direction: string;
+  botResponse: string | null;
   replyAction: string | null;
   createdAt: string;
 }
@@ -26,13 +26,11 @@ export default function ChatLogsPage() {
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [direction, setDirection] = useState("");
 
   async function loadLogs(page = 1) {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), limit: "50" });
     if (search) params.set("search", search);
-    if (direction) params.set("direction", direction);
 
     try {
       const res = await fetch(`/api/chatlogs?${params}`);
@@ -48,7 +46,7 @@ export default function ChatLogsPage() {
     }
   }
 
-  useEffect(() => { loadLogs(); }, [direction]);
+  useEffect(() => { loadLogs(); }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,15 +80,6 @@ export default function ChatLogsPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select
-            className="input-field !py-2 text-sm !w-auto"
-            value={direction}
-            onChange={(e) => setDirection(e.target.value)}
-          >
-            <option value="">ทั้งหมด</option>
-            <option value="INCOMING">ขาเข้า</option>
-            <option value="OUTGOING">ขาออก</option>
-          </select>
           <button type="submit" className="btn-primary text-sm !py-2">ค้นหา</button>
         </form>
       </div>
@@ -111,45 +100,50 @@ export default function ChatLogsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/50">
-                  <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3">ทิศทาง</th>
-                  <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3">ผู้ส่ง</th>
-                  <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3">ข้อความ</th>
-                  <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3">Action</th>
-                  <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3">เวลา</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3 w-1/5">ผู้ใช้ / กลุ่ม</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3 w-1/3">ข้อความจากผู้ใช้ (INCOMING)</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3 w-1/3">คำตอบของบอท (OUTGOING)</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3 w-10">Action</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase px-4 py-3 w-10">เวลา</th>
                 </tr>
               </thead>
               <tbody>
                 {logs.map((log) => (
-                  <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                  <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50/50 align-top">
                     <td className="px-4 py-3">
-                      {log.direction === "INCOMING" ? (
-                        <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-600">
-                          <ArrowDownLeft className="w-3 h-3" /> เข้า
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-600">
-                          <ArrowUpRight className="w-3 h-3" /> ออก
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900">
-                        {log.direction === "INCOMING" ? (log.displayName || "ผู้ใช้") : "🤖 Bot"}
+                      <div className="text-sm font-semibold text-gray-800">
+                        {log.displayName || "ผู้ใช้"}
+                      </div>
+                      <div className="text-[10px] text-gray-400 font-mono mt-0.5 truncate max-w-[150px]" title={log.lineUid}>
+                        UID: {log.lineUid.slice(0, 10)}...
                       </div>
                       {log.lineGroupId && (
-                        <div className="text-xs text-gray-400">Group</div>
+                        <span className="inline-flex items-center text-[10px] px-2 py-0.5 mt-1 rounded bg-amber-50 text-amber-700 font-medium">
+                          👥 Group
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-sm text-gray-700 max-w-md truncate">
+                      <div className="inline-block bg-blue-50 text-blue-900 text-sm px-3 py-2 rounded-2xl rounded-tl-none border border-blue-100 max-w-sm whitespace-pre-wrap break-words">
                         {log.messageText || "-"}
-                      </p>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      {log.replyAction && (
-                        <span className="text-xs px-2 py-1 rounded-full bg-purple-50 text-purple-600">
+                      {log.botResponse ? (
+                        <div className="inline-block bg-emerald-50 text-emerald-900 text-sm px-3 py-2 rounded-2xl rounded-tl-none border border-emerald-100 max-w-sm whitespace-pre-wrap break-words">
+                          {log.botResponse}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">ไม่มีการตอบกลับจากบอท / รอการประมวลผล</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {log.replyAction ? (
+                        <span className="inline-block text-[10px] font-semibold px-2 py-1 rounded bg-purple-50 text-purple-700 whitespace-nowrap">
                           {log.replyAction}
                         </span>
+                      ) : (
+                        <span className="text-gray-300">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
