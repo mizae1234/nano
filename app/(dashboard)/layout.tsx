@@ -24,6 +24,8 @@ import {
   Server,
   MessageSquare,
   Send,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 interface UserSession {
@@ -82,6 +84,20 @@ function DashboardLayoutContent({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [user, setUser] = useState<UserSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebar-collapsed");
+    if (saved === "true") {
+      setIsCollapsed(true);
+    }
+  }, []);
+
+  const toggleCollapse = () => {
+    const newState = !isCollapsed;
+    setIsCollapsed(newState);
+    localStorage.setItem("sidebar-collapsed", String(newState));
+  };
 
   const handleLogout = async () => {
     try {
@@ -150,22 +166,26 @@ function DashboardLayoutContent({
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-[260px] bg-white border-r border-gray-100 z-50 transform transition-transform duration-300 ${
+        className={`fixed top-0 left-0 h-full bg-white border-r border-gray-100 z-50 transform lg:translate-x-0 transition-all duration-300 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0`}
+        } ${isCollapsed ? "lg:w-[80px]" : "lg:w-[260px]"} w-[260px]`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100">
-            <div className="w-9 h-9 rounded-xl bg-gradient-nano flex items-center justify-center shadow-nano">
+          <div className={`flex items-center border-b border-gray-100 py-5 transition-all duration-300 ${
+            isCollapsed ? "lg:justify-center lg:px-2 px-5 gap-3" : "px-5 gap-3"
+          }`}>
+            <div className="w-9 h-9 rounded-xl bg-gradient-nano flex items-center justify-center shadow-nano shrink-0">
               <Bot className="w-5 h-5 text-white" />
             </div>
-            <div>
-              <div className="font-bold text-gray-900 text-sm">น้องนาโน</div>
-              <div className="text-xs text-gray-400">บริษัททดสอบ จำกัด</div>
+            <div className={`transition-all duration-300 flex-1 min-w-0 ${
+              isCollapsed ? "lg:hidden lg:opacity-0" : "opacity-100"
+            }`}>
+              <div className="font-bold text-gray-900 text-sm truncate">น้องนาโน</div>
+              <div className="text-xs text-gray-400 truncate">บริษัททดสอบ จำกัด</div>
             </div>
             <button
-              className="ml-auto lg:hidden p-1"
+              className="ml-auto lg:hidden p-1 shrink-0"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-5 h-5 text-gray-400" />
@@ -176,7 +196,9 @@ function DashboardLayoutContent({
           <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-6">
             {/* User Section */}
             <div>
-              <div className="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <div className={`px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider transition-all duration-300 ${
+                isCollapsed ? "lg:hidden lg:opacity-0" : "opacity-100"
+              }`}>
                 งานของฉัน
               </div>
               <div className="space-y-1">
@@ -184,15 +206,20 @@ function DashboardLayoutContent({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={
+                    className={`${
                       pathname === item.href
                         ? "sidebar-link-active"
                         : "sidebar-link"
-                    }
+                    } ${isCollapsed ? "lg:justify-center lg:px-2 lg:border-l-0" : ""}`}
                     onClick={() => setSidebarOpen(false)}
+                    title={isCollapsed ? item.label : undefined}
                   >
                     <item.icon className="w-5 h-5 shrink-0" />
-                    {item.label}
+                    <span className={`truncate transition-all duration-300 ${
+                      isCollapsed ? "lg:hidden lg:opacity-0" : "opacity-100"
+                    }`}>
+                      {item.label}
+                    </span>
                   </Link>
                 ))}
               </div>
@@ -201,7 +228,9 @@ function DashboardLayoutContent({
             {/* Operations Section */}
             {operationMenus.length > 0 && (
               <div>
-                <div className="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <div className={`px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider transition-all duration-300 ${
+                  isCollapsed ? "lg:hidden lg:opacity-0" : "opacity-100"
+                }`}>
                   จัดการงาน
                 </div>
                 <div className="space-y-1">
@@ -209,15 +238,20 @@ function DashboardLayoutContent({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={
+                      className={`${
                         pathname === item.href
                           ? "sidebar-link-active"
                           : "sidebar-link"
-                      }
+                      } ${isCollapsed ? "lg:justify-center lg:px-2 lg:border-l-0" : ""}`}
                       onClick={() => setSidebarOpen(false)}
+                      title={isCollapsed ? item.label : undefined}
                     >
                       <item.icon className="w-5 h-5 shrink-0" />
-                      {item.label}
+                      <span className={`truncate transition-all duration-300 ${
+                        isCollapsed ? "lg:hidden lg:opacity-0" : "opacity-100"
+                      }`}>
+                        {item.label}
+                      </span>
                     </Link>
                   ))}
                 </div>
@@ -227,7 +261,9 @@ function DashboardLayoutContent({
             {/* Admin Section */}
             {adminMenus.length > 0 && (
               <div>
-                <div className="px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <div className={`px-3 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider transition-all duration-300 ${
+                  isCollapsed ? "lg:hidden lg:opacity-0" : "opacity-100"
+                }`}>
                   ผู้ดูแลระบบ
                 </div>
                 <div className="space-y-1">
@@ -235,7 +271,7 @@ function DashboardLayoutContent({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={
+                      className={`${
                         item.href === "/admin"
                           ? pathname === "/admin"
                             ? "sidebar-link-active"
@@ -243,11 +279,16 @@ function DashboardLayoutContent({
                           : pathname === item.href || pathname.startsWith(item.href + "/")
                             ? "sidebar-link-active"
                             : "sidebar-link"
-                      }
+                      } ${isCollapsed ? "lg:justify-center lg:px-2 lg:border-l-0" : ""}`}
                       onClick={() => setSidebarOpen(false)}
+                      title={isCollapsed ? item.label : undefined}
                     >
                       <item.icon className="w-5 h-5 shrink-0" />
-                      {item.label}
+                      <span className={`truncate transition-all duration-300 ${
+                        isCollapsed ? "lg:hidden lg:opacity-0" : "opacity-100"
+                      }`}>
+                        {item.label}
+                      </span>
                     </Link>
                   ))}
                 </div>
@@ -256,19 +297,39 @@ function DashboardLayoutContent({
           </nav>
 
           {/* Plan Badge */}
-          <div className="px-4 py-3 border-t border-gray-100">
-            <div className="flex items-center gap-2">
-              <span className={`badge ${planInfo.color}`}>
-                {planInfo.label}
-              </span>
-              <span className="text-xs text-gray-400">แผนปัจจุบัน</span>
+          {!isCollapsed && (
+            <div className="px-4 py-3 border-t border-gray-100 transition-all duration-300">
+              <div className="flex items-center gap-2">
+                <span className={`badge ${planInfo.color}`}>
+                  {planInfo.label}
+                </span>
+                <span className="text-xs text-gray-400">แผนปัจจุบัน</span>
+              </div>
             </div>
+          )}
+
+          {/* Toggle Button */}
+          <div className="hidden lg:block border-t border-gray-100 p-3">
+            <button
+              onClick={toggleCollapse}
+              className="w-full flex items-center justify-center p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+              title={isCollapsed ? "ขยายเมนู" : "ยุบเมนู"}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="w-5 h-5" />
+              ) : (
+                <div className="flex items-center gap-2 w-full px-2">
+                  <ChevronLeft className="w-5 h-5" />
+                  <span className="text-xs font-medium">ยุบเมนู</span>
+                </div>
+              )}
+            </button>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className="lg:pl-[260px]">
+      <div className={`transition-all duration-300 ${isCollapsed ? "lg:pl-[80px]" : "lg:pl-[260px]"}`}>
         {/* Top Bar */}
         <header className="sticky top-0 z-30 glass border-b border-gray-100/50 px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between">

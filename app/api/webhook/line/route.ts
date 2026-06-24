@@ -164,6 +164,45 @@ export async function POST(request: NextRequest) {
         // ผู้ใช้เพิ่มเพื่อน
         const followUid = event.source.userId || "";
         const followGroupId = event.source.groupId || null;
+
+        // สร้างผู้ใช้ในระบบโดยอัตโนมัติเมื่อกดเพิ่มเพื่อน
+        if (followUid) {
+          try {
+            const existingUser = await prisma.user.findUnique({
+              where: {
+                tenantId_lineUid: {
+                  tenantId: tenant.id,
+                  lineUid: followUid,
+                },
+              },
+            });
+
+            if (!existingUser) {
+              let displayName = "ผู้ใช้งานใหม่";
+              let pictureUrl: string | null = null;
+              try {
+                const profile = await getLineProfile(tenant.lineOaToken!, followUid);
+                displayName = profile.displayName;
+                pictureUrl = profile.pictureUrl || null;
+              } catch (err) {
+                console.error("Failed to fetch LINE profile for follow event:", err);
+              }
+
+              await prisma.user.create({
+                data: {
+                  tenantId: tenant.id,
+                  lineUid: followUid,
+                  displayName,
+                  pictureUrl,
+                  role: "USER",
+                },
+              });
+            }
+          } catch (err) {
+            console.error("Failed to auto-create user on follow:", err);
+          }
+        }
+
         await replyAndLog(
           tenant.lineOaToken,
           event.replyToken,
@@ -185,10 +224,42 @@ export async function POST(request: NextRequest) {
       // วิเคราะห์คำสั่ง
       const action = parseNanoCommand(messageText, sourceType, tenant.plan);
 
-      // ดึง user
-      const user = await prisma.user.findFirst({
+      // ดึง user หรือสร้างใหม่เมื่อทักเข้ามาเป็นครั้งแรก
+      let user = await prisma.user.findFirst({
         where: { tenantId: tenant.id, lineUid },
       });
+
+      if (!user && lineUid) {
+        try {
+          let displayName = "ผู้ใช้งานใหม่";
+          let pictureUrl: string | null = null;
+          try {
+            if (sourceType !== "user" && lineGroupId) {
+              const profile = await getLineGroupMemberProfile(tenant.lineOaToken!, lineGroupId, lineUid);
+              displayName = profile.displayName;
+              pictureUrl = profile.pictureUrl || null;
+            } else {
+              const profile = await getLineProfile(tenant.lineOaToken!, lineUid);
+              displayName = profile.displayName;
+              pictureUrl = profile.pictureUrl || null;
+            }
+          } catch (err) {
+            console.error("Failed to fetch LINE profile for auto-create user:", err);
+          }
+
+          user = await prisma.user.create({
+            data: {
+              tenantId: tenant.id,
+              lineUid,
+              displayName,
+              pictureUrl,
+              role: "USER",
+            },
+          });
+        } catch (err) {
+          console.error("Failed to auto-create user on message:", err);
+        }
+      }
 
       // ─── ตรวจสอบและสร้าง GroupConfig อัตโนมัติ ────────────────
       if (lineGroupId) {
