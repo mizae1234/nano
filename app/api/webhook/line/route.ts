@@ -19,14 +19,17 @@ export async function POST(request: NextRequest) {
     const body = await request.text();
     const signature = request.headers.get("x-line-signature");
 
-    // ดึง tenant จาก subdomain หรือ query param
+    // ดึง tenant จาก header → query param → hostname → default
+    const hostname = request.headers.get("host") || "";
+    const subdomain = hostname.split(".")[0]; // เช่น "icare" จาก "icare.technomand-ai.cloud"
+    const isMainDomain = hostname === "nano.technomand-ai.cloud" || hostname.startsWith("localhost");
+
     const tenantSlug =
       request.headers.get("x-tenant-slug") ||
-      request.nextUrl.searchParams.get("tenant");
-
-    if (!tenantSlug) {
-      return NextResponse.json({ error: "ไม่พบ tenant" }, { status: 400 });
-    }
+      request.nextUrl.searchParams.get("tenant") ||
+      (!isMainDomain && subdomain !== "nano" ? subdomain : null) ||
+      process.env.DEV_TENANT_SLUG ||   // fallback: tenant default จาก env
+      "demo";
 
     const tenant = await prisma.tenant.findUnique({
       where: { slug: tenantSlug },
