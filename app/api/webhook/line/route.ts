@@ -141,11 +141,10 @@ export async function POST(request: NextRequest) {
       switch (action.action) {
         case "GREETING": {
           const name = botMeta.botName || "น้องนาโน";
-          const persona = botMeta.botPersona || "ค่ะ";
           await replyMessage(tenant.lineOaToken, event.replyToken, [
             {
               type: "text",
-              text: `สวัสดีครับ/ค่ะ 👋 ยินดีให้บริการ${persona}\n\n${name}พร้อมช่วยท่านแจ้งปัญหา ดูสถานะ ticket หรือถามข้อมูลต่างๆ\n\nพิมพ์ "เมนู" เพื่อดูคำสั่งทั้งหมด${persona}`,
+              text: `สวัสดีค่ะ 👋 ยินดีให้บริการ\n\n${name} พร้อมช่วยแจ้งปัญหา ดูสถานะ ticket หรือถามข้อมูลต่างๆ\n\nพิมพ์ "เมนู" เพื่อดูคำสั่งทั้งหมดค่ะ`,
             } as never,
           ]);
           break;

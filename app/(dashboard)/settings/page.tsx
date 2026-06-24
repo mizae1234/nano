@@ -135,18 +135,8 @@ function BotConfigSection() {
               />
             </div>
           </div>
-          <div>
-            <label className="input-label">AI Model</label>
-            <select
-              className="input-field"
-              value={config.aiModel}
-              onChange={(e) => setConfig({ ...config, aiModel: e.target.value })}
-            >
-              <option value="gemini-2.0-flash">Gemini 2.0 Flash (แนะนำ)</option>
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash (เร็ว)</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro (แม่นยำสูง)</option>
-            </select>
-          </div>
+          {/* AI Model fixed to gemini-2.0-flash — hidden from UI */}
+          <input type="hidden" value="gemini-2.0-flash" onChange={() => {}} />
         </div>
       </div>
 

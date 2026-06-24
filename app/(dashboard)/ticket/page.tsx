@@ -3,16 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Ticket,
-  PlusCircle,
-  Search,
-  ChevronRight,
-  Clock,
-  AlertCircle,
-  CheckCircle2,
-  Circle,
-  Pause,
-  Loader2,
+  PlusCircle, Search, LayoutList, Columns, Loader2,
+  Clock, CheckCircle2, Circle, Pause, XCircle, MessageSquare,
 } from "lucide-react";
 
 interface TicketItem {
@@ -30,57 +22,105 @@ interface TicketItem {
   _count: { comments: number };
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  OPEN: { label: "เปิด", color: "bg-blue-100 text-blue-700", icon: Circle },
-  IN_PROGRESS: { label: "กำลังดำเนินการ", color: "bg-amber-100 text-amber-700", icon: Clock },
-  PENDING: { label: "รอข้อมูล", color: "bg-purple-100 text-purple-700", icon: Pause },
-  RESOLVED: { label: "แก้ไขแล้ว", color: "bg-emerald-100 text-emerald-700", icon: CheckCircle2 },
-  CLOSED: { label: "ปิด", color: "bg-gray-100 text-gray-600", icon: CheckCircle2 },
+const COLUMNS = [
+  { key: "OPEN",        label: "เปิด",             icon: Circle,       color: "#3B82F6", bg: "#EFF6FF", border: "#BFDBFE" },
+  { key: "IN_PROGRESS", label: "กำลังดำเนินการ",   icon: Clock,        color: "#F59E0B", bg: "#FFFBEB", border: "#FDE68A" },
+  { key: "PENDING",     label: "รอข้อมูล",          icon: Pause,        color: "#8B5CF6", bg: "#F5F3FF", border: "#DDD6FE" },
+  { key: "RESOLVED",    label: "แก้ไขแล้ว",         icon: CheckCircle2, color: "#10B981", bg: "#ECFDF5", border: "#A7F3D0" },
+  { key: "CLOSED",      label: "ปิด",               icon: XCircle,      color: "#6B7280", bg: "#F9FAFB", border: "#E5E7EB" },
+];
+
+const PRIORITY_DOT: Record<string, string> = {
+  LOW: "bg-gray-300",
+  MEDIUM: "bg-blue-400",
+  HIGH: "bg-amber-400",
+  URGENT: "bg-red-500",
 };
 
-const TICKET_TYPE_CONFIG: Record<string, { label: string; icon: string }> = {
-  BUG: { label: "ปัญหาระบบ", icon: "🐛" },
-  FEATURE: { label: "ขอฟีเจอร์", icon: "✨" },
-  TASK: { label: "งานทั่วไป", icon: "📋" },
-  QUESTION: { label: "คำถาม", icon: "❓" },
+const PRIORITY_LABEL: Record<string, string> = {
+  LOW: "ต่ำ", MEDIUM: "กลาง", HIGH: "สูง", URGENT: "ด่วน!",
 };
 
-const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
-  LOW: { label: "ต่ำ", color: "text-gray-400" },
-  MEDIUM: { label: "ปานกลาง", color: "text-blue-500" },
-  HIGH: { label: "สูง", color: "text-amber-500" },
-  URGENT: { label: "ด่วนมาก", color: "text-red-500" },
-};
+function TicketCard({ ticket }: { ticket: TicketItem }) {
+  const ticketDisplay = ticket.system
+    ? `${ticket.system.ticketPrefix}-${ticket.ticketNo}`
+    : `#${ticket.ticketNo}`;
+  const dotColor = PRIORITY_DOT[ticket.priority] || PRIORITY_DOT.MEDIUM;
+
+  return (
+    <Link
+      href={`/ticket/${ticket.id}`}
+      className="block bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 p-3 group"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`shrink-0 w-2 h-2 rounded-full ${dotColor}`} title={PRIORITY_LABEL[ticket.priority]} />
+          <span className="text-xs font-mono font-bold truncate" style={{ color: ticket.system?.color || "#0066FF" }}>
+            {ticketDisplay}
+          </span>
+        </div>
+        {ticket.system && (
+          <span
+            className="shrink-0 text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+            style={{ backgroundColor: `${ticket.system.color}18`, color: ticket.system.color }}
+          >
+            {ticket.system.icon} {ticket.system.name}
+          </span>
+        )}
+      </div>
+
+      {/* Title */}
+      <p className="text-sm font-medium text-gray-800 line-clamp-2 mb-2 group-hover:text-nano-600 transition-colors">
+        {ticket.title}
+      </p>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span className="truncate">{ticket.department?.name || "ทั่วไป"}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          {ticket._count.comments > 0 && (
+            <span className="flex items-center gap-0.5">
+              <MessageSquare className="w-3 h-3" />
+              {ticket._count.comments}
+            </span>
+          )}
+          <span>
+            {new Date(ticket.createdAt).toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit" })}
+          </span>
+        </div>
+      </div>
+
+      {ticket.assignedTo && (
+        <div className="mt-2 flex items-center gap-1">
+          <div className="w-5 h-5 rounded-full bg-nano-100 flex items-center justify-center text-[9px] font-bold text-nano-600">
+            {ticket.assignedTo.displayName.charAt(0)}
+          </div>
+          <span className="text-[10px] text-gray-400 truncate">{ticket.assignedTo.displayName}</span>
+        </div>
+      )}
+    </Link>
+  );
+}
 
 export default function MyTicketsPage() {
   const [tickets, setTickets] = useState<TicketItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [view, setView] = useState<"kanban" | "list">("kanban");
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    fetch("/api/tickets?limit=100")
-      .then((res) => res.json())
-      .then((data) => {
-        setTickets(data.tickets || []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+    fetch("/api/tickets?limit=200")
+      .then((r) => r.json())
+      .then((d) => { setTickets(d.tickets || []); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
-  const filteredTickets = tickets.filter((t) => {
-    if (statusFilter !== "all" && t.status !== statusFilter) return false;
-    const ticketDisplay = t.system ? `${t.system.ticketPrefix}-${t.ticketNo}` : `#${t.ticketNo}`;
-    if (
-      searchQuery &&
-      !t.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !ticketDisplay.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-      return false;
-    return true;
+  const filtered = tickets.filter((t) => {
+    if (!searchQuery) return true;
+    const display = t.system ? `${t.system.ticketPrefix}-${t.ticketNo}` : `#${t.ticketNo}`;
+    const q = searchQuery.toLowerCase();
+    return t.title.toLowerCase().includes(q) || display.toLowerCase().includes(q);
   });
 
   const stats = {
@@ -92,157 +132,153 @@ export default function MyTicketsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex items-center justify-center py-24">
         <Loader2 className="w-8 h-8 text-nano-500 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 gap-3">
         {[
-          { label: "ทั้งหมด", value: stats.total, color: "bg-nano-50 text-nano-600 border-nano-100" },
-          { label: "เปิดอยู่", value: stats.open, color: "bg-blue-50 text-blue-600 border-blue-100" },
-          { label: "กำลังดำเนินการ", value: stats.inProgress, color: "bg-amber-50 text-amber-600 border-amber-100" },
-          { label: "แก้ไขแล้ว", value: stats.resolved, color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
-        ].map((stat) => (
-          <div key={stat.label} className={`rounded-2xl border p-4 ${stat.color}`}>
-            <div className="text-2xl font-bold">{stat.value}</div>
-            <div className="text-sm opacity-80">{stat.label}</div>
+          { label: "ทั้งหมด", value: stats.total, color: "text-gray-700", bg: "bg-gray-50" },
+          { label: "เปิดอยู่", value: stats.open, color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "ดำเนินการ", value: stats.inProgress, color: "text-amber-600", bg: "bg-amber-50" },
+          { label: "แก้ไขแล้ว", value: stats.resolved, color: "text-emerald-600", bg: "bg-emerald-50" },
+        ].map((s) => (
+          <div key={s.label} className={`${s.bg} rounded-2xl p-3 text-center`}>
+            <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+            <div className="text-[10px] text-gray-500 mt-0.5">{s.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Actions Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="relative flex-1 w-full">
+      {/* Toolbar */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="ค้นหา Ticket..."
-            className="input-field !pl-10"
+            placeholder="ค้นหา ticket..."
+            className="input-field !pl-9 !py-2 text-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <select
-            className="input-field !w-auto text-sm flex-1 sm:flex-initial"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+        {/* View Toggle */}
+        <div className="flex items-center bg-gray-100 rounded-xl p-1 gap-1">
+          <button
+            onClick={() => setView("kanban")}
+            className={`p-1.5 rounded-lg transition-all ${view === "kanban" ? "bg-white shadow text-nano-600" : "text-gray-400 hover:text-gray-600"}`}
+            title="Kanban"
           >
-            <option value="all">ทุกสถานะ</option>
-            <option value="OPEN">เปิด</option>
-            <option value="IN_PROGRESS">กำลังดำเนินการ</option>
-            <option value="PENDING">รอข้อมูล</option>
-            <option value="RESOLVED">แก้ไขแล้ว</option>
-            <option value="CLOSED">ปิด</option>
-          </select>
-
-          <Link href="/ticket/new" className="btn-primary text-sm whitespace-nowrap">
-            <PlusCircle className="w-4 h-4 mr-1.5" />
-            แจ้งปัญหาใหม่
-          </Link>
+            <Columns className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setView("list")}
+            className={`p-1.5 rounded-lg transition-all ${view === "list" ? "bg-white shadow text-nano-600" : "text-gray-400 hover:text-gray-600"}`}
+            title="List"
+          >
+            <LayoutList className="w-4 h-4" />
+          </button>
         </div>
+
+        <Link href="/ticket/new" className="btn-primary text-sm whitespace-nowrap !py-2">
+          <PlusCircle className="w-4 h-4 mr-1" />
+          แจ้งปัญหา
+        </Link>
       </div>
 
-      {/* Ticket List */}
-      <div className="space-y-3">
-        {filteredTickets.length === 0 ? (
-          <div className="card text-center py-16">
-            <Ticket className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-500 mb-2">ไม่มี Ticket</h3>
-            <p className="text-sm text-gray-400 mb-6">ยังไม่มี Ticket ในขณะนี้</p>
-            <Link href="/ticket/new" className="btn-primary">
-              <PlusCircle className="w-4 h-4 mr-1.5" />
-              แจ้งปัญหาใหม่
-            </Link>
-          </div>
-        ) : (
-          filteredTickets.map((ticket) => {
-            const statusInfo = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.OPEN;
-            const priorityInfo = PRIORITY_CONFIG[ticket.priority] || PRIORITY_CONFIG.MEDIUM;
-            const typeInfo = TICKET_TYPE_CONFIG[ticket.ticketType] || TICKET_TYPE_CONFIG.BUG;
-            const StatusIcon = statusInfo.icon;
-            const ticketDisplay = ticket.system
-              ? `${ticket.system.ticketPrefix}-${ticket.ticketNo}`
-              : `#${ticket.ticketNo}`;
-
+      {/* ─── KANBAN VIEW ─────────────────────────────────────────── */}
+      {view === "kanban" && (
+        <div className="flex gap-3 overflow-x-auto pb-4 -mx-4 px-4" style={{ scrollSnapType: "x mandatory" }}>
+          {COLUMNS.map((col) => {
+            const colTickets = filtered.filter((t) => t.status === col.key);
+            const Icon = col.icon;
             return (
-              <Link
-                key={ticket.id}
-                href={`/ticket/${ticket.id}`}
-                className="card-hover flex items-center gap-4 !p-4 group"
+              <div
+                key={col.key}
+                className="flex-shrink-0 w-[260px] rounded-2xl flex flex-col"
+                style={{ scrollSnapAlign: "start", backgroundColor: col.bg, border: `1.5px solid ${col.border}` }}
               >
-                <div className={`shrink-0 ${priorityInfo.color}`}>
-                  <StatusIcon className="w-5 h-5" />
+                {/* Column Header */}
+                <div className="flex items-center justify-between px-3 pt-3 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Icon className="w-4 h-4" style={{ color: col.color }} />
+                    <span className="text-sm font-semibold text-gray-700">{col.label}</span>
+                  </div>
+                  <span
+                    className="text-xs font-bold px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: `${col.color}22`, color: col.color }}
+                  >
+                    {colTickets.length}
+                  </span>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <span
-                      className="text-sm font-mono font-bold"
-                      style={{ color: ticket.system?.color || "#0066FF" }}
-                    >
-                      {ticketDisplay}
-                    </span>
-                    {ticket.system && (
-                      <span
-                        className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full"
-                        style={{
-                          backgroundColor: `${ticket.system.color}15`,
-                          color: ticket.system.color,
-                        }}
-                      >
-                        {ticket.system.icon || "⚙️"} {ticket.system.name}
-                      </span>
-                    )}
-                    <span className="text-xs text-gray-500">
-                      {typeInfo.icon} {typeInfo.label}
-                    </span>
-                    <span className={`badge ${statusInfo.color} text-[10px]`}>
-                      {statusInfo.label}
-                    </span>
-                  </div>
-                  <h3 className="text-sm font-medium text-gray-900 truncate">
-                    {ticket.title}
-                  </h3>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                    <span>{ticket.department?.name || "ทั่วไป"}</span>
-                    <span>•</span>
-                    <span>
-                      {new Date(ticket.createdAt).toLocaleDateString("th-TH", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    {ticket.assignedTo && (
-                      <>
-                        <span>•</span>
-                        <span>🔧 {ticket.assignedTo.displayName}</span>
-                      </>
-                    )}
-                    {ticket._count.comments > 0 && (
-                      <>
-                        <span>•</span>
-                        <span>💬 {ticket._count.comments}</span>
-                      </>
-                    )}
-                  </div>
+                {/* Cards */}
+                <div className="flex-1 overflow-y-auto max-h-[calc(100vh-280px)] px-3 pb-3 space-y-2">
+                  {colTickets.length === 0 ? (
+                    <div className="text-center py-8 text-xs text-gray-400">ไม่มี ticket</div>
+                  ) : (
+                    colTickets.map((t) => <TicketCard key={t.id} ticket={t} />)
+                  )}
                 </div>
-
-                <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-nano-500 transition-colors shrink-0" />
-              </Link>
+              </div>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
+
+      {/* ─── LIST VIEW ───────────────────────────────────────────── */}
+      {view === "list" && (
+        <div className="space-y-2">
+          {filtered.length === 0 ? (
+            <div className="card text-center py-16">
+              <p className="text-gray-400 text-sm">ไม่มี Ticket</p>
+              <Link href="/ticket/new" className="btn-primary mt-4 inline-flex">
+                <PlusCircle className="w-4 h-4 mr-1.5" /> แจ้งปัญหาใหม่
+              </Link>
+            </div>
+          ) : (
+            filtered.map((ticket) => {
+              const col = COLUMNS.find((c) => c.key === ticket.status) || COLUMNS[0];
+              const Icon = col.icon;
+              const ticketDisplay = ticket.system
+                ? `${ticket.system.ticketPrefix}-${ticket.ticketNo}`
+                : `#${ticket.ticketNo}`;
+              return (
+                <Link
+                  key={ticket.id}
+                  href={`/ticket/${ticket.id}`}
+                  className="card-hover flex items-center gap-3 !p-3 group"
+                >
+                  <Icon className="w-5 h-5 shrink-0" style={{ color: col.color }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-mono font-bold" style={{ color: ticket.system?.color || "#0066FF" }}>
+                        {ticketDisplay}
+                      </span>
+                      <span
+                        className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
+                        style={{ backgroundColor: `${col.color}20`, color: col.color }}
+                      >
+                        {col.label}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-800 truncate">{ticket.title}</p>
+                  </div>
+                  <span className="text-[10px] text-gray-400 shrink-0">
+                    {new Date(ticket.createdAt).toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit" })}
+                  </span>
+                </Link>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }
