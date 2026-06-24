@@ -25,7 +25,7 @@ function BotConfigSection() {
     menuMessage: "เลือกสิ่งที่ต้องการค่ะ 😊",
     triggerWords: "นาโน,@นาโน,nano,@nano",
     systemPrompt: "",
-    aiModel: "gemini-2.5-flash-preview-05-20",
+    aiModel: "gemini-2.5-flash-preview",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,7 +43,7 @@ function BotConfigSection() {
           menuMessage: data.menuMessage || "",
           triggerWords: data.triggerWords || "นาโน,@นาโน,nano,@nano",
           systemPrompt: data.systemPrompt || "",
-          aiModel: data.aiModel || "gemini-2.5-flash-preview-05-20",
+          aiModel: data.aiModel || "gemini-2.5-flash-preview",
         });
         setLoading(false);
       })
@@ -135,8 +135,8 @@ function BotConfigSection() {
               />
             </div>
           </div>
-          {/* AI Model fixed to gemini-2.5-flash-preview-05-20 — hidden from UI */}
-          <input type="hidden" value="gemini-2.5-flash-preview-05-20" onChange={() => {}} />
+          {/* AI Model fixed to gemini-2.5-flash-preview — hidden from UI */}
+          <input type="hidden" value="gemini-2.5-flash-preview" onChange={() => {}} />
         </div>
       </div>
 
