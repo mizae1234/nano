@@ -237,6 +237,7 @@ model Ticket {
   ticketType   TicketType   @default(BUG)     // ประเภทงาน
   title        String
   description  String
+  images       String[]     @default([])
   status       TicketStatus @default(OPEN)
   priority     Priority     @default(MEDIUM)
   categoryId   String?

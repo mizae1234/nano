@@ -96,8 +96,8 @@ export async function PATCH(
 
     if (!isIT) {
       const keys = Object.keys(body);
-      // คีย์ที่ Creator สามารถแก้ไขได้: status (ต้องเป็น CLOSED เท่านั้น), notifyOnResolve, notifyChannel, notifyGroupId
-      const allowedKeysForCreator = ["status", "notifyOnResolve", "notifyChannel", "notifyGroupId"];
+      // คีย์ที่ Creator สามารถแก้ไขได้: status (ต้องเป็น CLOSED เท่านั้น), notifyOnResolve, notifyChannel, notifyGroupId, images
+      const allowedKeysForCreator = ["status", "notifyOnResolve", "notifyChannel", "notifyGroupId", "images"];
       const hasOnlyAllowedKeys = keys.every((k) => allowedKeysForCreator.includes(k));
 
       // ตรวจสอบความถูกต้องของสิทธิ์การแก้สถานะ
@@ -164,6 +164,11 @@ export async function PATCH(
     if (body.notifyGroupId !== undefined && body.notifyGroupId !== ticket.notifyGroupId) {
       updateData.notifyGroupId = body.notifyGroupId;
       auditDetails.push("เปลี่ยนกลุ่มแจ้งเตือน");
+    }
+
+    if (body.images !== undefined) {
+      updateData.images = body.images;
+      auditDetails.push("อัปเดตรูปแนบปัญหาเพิ่มเติม");
     }
 
     if (Object.keys(updateData).length === 0) {

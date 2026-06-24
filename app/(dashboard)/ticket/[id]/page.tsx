@@ -18,6 +18,8 @@ import {
   History,
   Loader2,
   AlertTriangle,
+  Image,
+  Trash2,
 } from "lucide-react";
 
 interface CommentItem {
@@ -57,6 +59,7 @@ interface TicketDetail {
   system: { id: string; name: string; color: string; ticketPrefix: string } | null;
   comments: CommentItem[];
   auditLogs: AuditLogItem[];
+  images?: string[];
   notifyOnResolve: boolean;
   notifyChannel: string;
   notifyGroupId: string | null;
@@ -122,6 +125,7 @@ export default function TicketDetailPage() {
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [updating, setUpdating] = useState(false);
   const [groups, setGroups] = useState<any[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     loadSessionAndTicket();
@@ -231,6 +235,60 @@ export default function TicketDetailPage() {
     }
   }
 
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("กรุณาเลือกไฟล์รูปภาพเท่านั้นค่ะ");
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("ticketId", id as string);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "อัปโหลดรูปล้มเหลว");
+      }
+
+      const uploadResult = await res.json();
+      const newImageUrl = uploadResult.url;
+
+      const currentImages = ticket?.images || [];
+      const updatedImages = [...currentImages, newImageUrl];
+
+      await handleUpdateField("images", updatedImages);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  async function handleRemoveImage(indexToRemove: number) {
+    if (!confirm("คุณต้องการลบรูปภาพแนบนี้ใช่หรือไม่คะ?")) return;
+
+    try {
+      const currentImages = ticket?.images || [];
+      const updatedImages = currentImages.filter((_, idx) => idx !== indexToRemove);
+
+      await handleUpdateField("images", updatedImages);
+    } catch (err) {
+      console.error(err);
+      alert("เกิดข้อผิดพลาดในการลบรูปภาพ");
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -255,6 +313,7 @@ export default function TicketDetailPage() {
   }
 
   const isIT = ["IT", "DEPT_ADMIN", "ADMIN", "SUPER_ADMIN"].includes(sessionUser?.role);
+  const isCreator = sessionUser?.id === ticket.createdBy.id;
   const statusInfo = STATUS_OPTIONS.find((s) => s.value === ticket.status) || STATUS_OPTIONS[0];
   const priorityInfo = PRIORITY_OPTIONS.find((p) => p.value === ticket.priority) || PRIORITY_OPTIONS[0];
   const typeInfo = TICKET_TYPE_CONFIG[ticket.ticketType] || TICKET_TYPE_CONFIG.BUG;
@@ -313,6 +372,58 @@ export default function TicketDetailPage() {
             <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
               {ticket.description}
             </p>
+
+            {/* รูปภาพแนบเพิ่มเติม */}
+            {ticket.images && ticket.images.length > 0 && (
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <div className="text-xs font-semibold text-gray-400 mb-2">รูปภาพแนบเพิ่มเติม ({ticket.images.length})</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {ticket.images.map((url, idx) => (
+                    <div key={idx} className="relative group rounded-lg overflow-hidden border border-gray-200 aspect-video bg-gray-50">
+                      <img
+                        src={url}
+                        alt={`Attachment ${idx + 1}`}
+                        className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-200"
+                        onClick={() => window.open(url, "_blank")}
+                      />
+                      {(isIT || isCreator) && (
+                        <button
+                          type="button"
+                          className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                          onClick={() => handleRemoveImage(idx)}
+                          title="ลบรูปภาพ"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* แนบรูปภาพเพิ่มเติม */}
+            {(isIT || isCreator) && (
+              <div className="mt-4 flex items-center gap-2">
+                <label className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium cursor-pointer transition-all">
+                  <Image className="w-3.5 h-3.5 text-gray-500" />
+                  <span>แนบรูปภาพเพิ่มเติม</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                  />
+                </label>
+                {uploadingImage && (
+                  <span className="flex items-center gap-1 text-xs text-gray-400">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    กำลังอัปโหลด...
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center gap-4 mt-4 pt-4 border-t border-gray-100 text-sm text-gray-500">
               <span className="flex items-center gap-1">
