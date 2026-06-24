@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MessageSquare, Plus, Loader2, Check, X, Trash2, Pencil } from "lucide-react";
+import { MessageSquare, Loader2, Check, X, Trash2, Pencil } from "lucide-react";
 
 interface SystemInfo {
   id: string;
@@ -25,8 +25,6 @@ export default function GroupsPage() {
   const [groups, setGroups] = useState<GroupItem[]>([]);
   const [systems, setSystems] = useState<SystemInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ lineGroupId: "", name: "", systemIds: [] as string[] });
   const [editingGroup, setEditingGroup] = useState<GroupItem | null>(null);
   const [editForm, setEditForm] = useState({ name: "", systemIds: [] as string[] });
   const [saving, setSaving] = useState(false);
@@ -42,30 +40,6 @@ export default function GroupsPage() {
     setGroups(groupRes.groups || []);
     setSystems(sysRes.systems?.filter((s: SystemInfo & { isActive: boolean }) => s.isActive) || []);
     setLoading(false);
-  }
-
-  async function handleCreate() {
-    setError("");
-    if (!form.lineGroupId || !form.name) {
-      setError("กรุณากรอก LINE Group ID และ ชื่อ");
-      return;
-    }
-    setSaving(true);
-    const res = await fetch("/api/groups", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error);
-      setSaving(false);
-      return;
-    }
-    setShowForm(false);
-    setForm({ lineGroupId: "", name: "", systemIds: [] });
-    setSaving(false);
-    loadData();
   }
 
   async function handleUpdate() {
@@ -101,15 +75,6 @@ export default function GroupsPage() {
     loadData();
   }
 
-  function toggleSystem(sysId: string) {
-    setForm((prev) => ({
-      ...prev,
-      systemIds: prev.systemIds.includes(sysId)
-        ? prev.systemIds.filter((id) => id !== sysId)
-        : [...prev.systemIds, sysId],
-    }));
-  }
-
   function toggleEditSystem(sysId: string) {
     setEditForm((prev) => ({
       ...prev,
@@ -121,7 +86,6 @@ export default function GroupsPage() {
 
   function startEdit(group: GroupItem) {
     setEditingGroup(group);
-    setShowForm(false);
     setEditForm({
       name: group.name,
       systemIds: group.groupSystems.map((gs) => gs.system.id),
@@ -149,92 +113,7 @@ export default function GroupsPage() {
             Config LINE Group ↔ ระบบ — Group ที่ผูก 1 ระบบ บอทจะรู้เองอัตโนมัติ | ผูกหลายระบบ บอทจะถาม | ไม่ผูกระบบก็ได้
           </p>
         </div>
-        {!showForm && !editingGroup && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="btn-primary flex items-center gap-2 text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            เพิ่ม LINE Group
-          </button>
-        )}
       </div>
-
-      {/* Create Form */}
-      {showForm && (
-        <div className="card border-nano-200 bg-nano-50/30">
-          <h3 className="font-semibold text-gray-900 mb-4">เพิ่ม LINE Group</h3>
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 rounded-lg p-3 mb-4">{error}</div>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">ชื่อ Group</label>
-              <input
-                className="input-field mt-1"
-                placeholder="เช่น Support Saran Jeans"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">LINE Group ID</label>
-              <input
-                className="input-field mt-1"
-                placeholder="C1234..."
-                value={form.lineGroupId}
-                onChange={(e) => setForm({ ...form, lineGroupId: e.target.value })}
-              />
-              <p className="text-[10px] text-gray-400 mt-1">
-                น้องนาโนจะแจ้ง Group ID เมื่อถูกเพิ่มเข้ากลุ่ม
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <label className="text-sm font-medium text-gray-700">ผูกกับระบบ (เลือกได้หลายระบบ หรือไม่ระบุก็ได้)</label>
-            <p className="text-[10px] text-gray-400 mb-2">
-              ผูก 1 ระบบ = บอทรู้เองอัตโนมัติ | ผูกหลายระบบ = บอทจะถาม | ไม่ผูกระบบ = ยังไม่ผูกระบบ
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {systems.map((sys) => (
-                <button
-                  key={sys.id}
-                  type="button"
-                  onClick={() => toggleSystem(sys.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-all ${
-                    form.systemIds.includes(sys.id)
-                      ? "border-transparent text-white"
-                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                  }`}
-                  style={
-                    form.systemIds.includes(sys.id)
-                      ? { backgroundColor: sys.color }
-                      : undefined
-                  }
-                >
-                  {sys.icon || "⚙️"} {sys.name}
-                  {form.systemIds.includes(sys.id) && <Check className="w-3.5 h-3.5" />}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex gap-2 mt-4">
-            <button
-              onClick={handleCreate}
-              disabled={saving}
-              className="btn-primary flex items-center gap-2"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-              สร้าง Group
-            </button>
-            <button onClick={() => setShowForm(false)} className="btn-secondary">
-              ยกเลิก
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Edit Form */}
       {editingGroup && (
@@ -383,7 +262,7 @@ export default function GroupsPage() {
         ))}
       </div>
 
-      {groups.length === 0 && !showForm && (
+      {groups.length === 0 && (
         <div className="text-center py-12 text-gray-400">
           <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="text-sm">ยังไม่มี LINE Group</p>

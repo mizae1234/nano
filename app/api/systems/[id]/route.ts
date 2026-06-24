@@ -5,6 +5,7 @@ import { getNanoSession } from "@/lib/session";
 import prisma from "@/lib/prisma";
 import { hasMinRole } from "@/lib/tenant";
 import { Role } from "@prisma/client";
+import { encrypt } from "@/lib/encrypt";
 
 // GET /api/systems/[id]
 export async function GET(
@@ -73,8 +74,8 @@ export async function PATCH(
         ...(body.icon !== undefined && { icon: body.icon }),
         ...(body.isActive !== undefined && { isActive: body.isActive }),
         ...(body.defaultAssigneeId !== undefined && { defaultAssigneeId: body.defaultAssigneeId }),
-        ...(body.lineOaToken !== undefined && { lineOaToken: body.lineOaToken }),
-        ...(body.lineOaSecret !== undefined && { lineOaSecret: body.lineOaSecret }),
+        ...(body.lineOaToken !== undefined && { lineOaToken: body.lineOaToken ? encrypt(body.lineOaToken) : null }),
+        ...(body.lineOaSecret !== undefined && { lineOaSecret: body.lineOaSecret ? encrypt(body.lineOaSecret) : null }),
         ...(body.isDefault !== undefined && { isDefault: body.isDefault }),
       },
     });

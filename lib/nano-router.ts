@@ -113,7 +113,12 @@ export function parseNanoCommand(
     const afterCommand = text.slice(createCheck.keyword.length).trim();
     if (!afterCommand) return { action: "SHOW_SYSTEMS" };
     const { systemCode, cleanText } = extractSystemCode(afterCommand);
-    if (!cleanText) return { action: "SHOW_SYSTEMS" };
+    if (!cleanText) {
+      if (systemCode) {
+        return { action: "CREATE_TICKET", text: "", systemCode };
+      }
+      return { action: "SHOW_SYSTEMS" };
+    }
     return { action: "CREATE_TICKET", text: cleanText, systemCode };
   }
 

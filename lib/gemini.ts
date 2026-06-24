@@ -246,6 +246,16 @@ interface TenantSnapshot {
     priority: string;
     system: string;
     createdAt: string;
+    assignedTo: string;
+  }>;
+  pendingTickets: Array<{
+    no: number;
+    title: string;
+    status: string;
+    priority: string;
+    system: string;
+    createdAt: string;
+    assignedTo: string;
   }>;
   departments: string[];
   systems: string[];
@@ -261,7 +271,7 @@ async function fetchTenantSnapshot(ctx: BotQueryContext): Promise<TenantSnapshot
       : {}),
   };
 
-  const [open, inProgress, resolved, urgent, myTickets, recent, depts, systems] =
+  const [open, inProgress, resolved, urgent, myTickets, recent, pending, depts, systems] =
     await Promise.all([
       prismaReadonly.ticket.count({ where: { ...where, status: "OPEN" } }),
       prismaReadonly.ticket.count({ where: { ...where, status: "IN_PROGRESS" } }),
@@ -279,6 +289,24 @@ async function fetchTenantSnapshot(ctx: BotQueryContext): Promise<TenantSnapshot
           priority: true,
           createdAt: true,
           system: { select: { name: true, ticketPrefix: true } },
+          assignedTo: { select: { displayName: true } },
+        },
+      }),
+      prismaReadonly.ticket.findMany({
+        where: {
+          ...where,
+          status: { in: ["OPEN", "IN_PROGRESS", "PENDING"] }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 15,
+        select: {
+          ticketNo: true,
+          title: true,
+          status: true,
+          priority: true,
+          createdAt: true,
+          system: { select: { name: true, ticketPrefix: true } },
+          assignedTo: { select: { displayName: true } },
         },
       }),
       prismaReadonly.department.findMany({
@@ -304,6 +332,16 @@ async function fetchTenantSnapshot(ctx: BotQueryContext): Promise<TenantSnapshot
       priority: t.priority,
       system: t.system ? `${t.system.ticketPrefix}-${t.ticketNo}` : `#${t.ticketNo}`,
       createdAt: t.createdAt.toLocaleDateString("th-TH"),
+      assignedTo: t.assignedTo?.displayName || "ยังไม่ได้มอบหมาย",
+    })),
+    pendingTickets: pending.map((t) => ({
+      no: t.ticketNo,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      system: t.system ? `${t.system.ticketPrefix}-${t.ticketNo}` : `#${t.ticketNo}`,
+      createdAt: t.createdAt.toLocaleDateString("th-TH"),
+      assignedTo: t.assignedTo?.displayName || "ยังไม่ได้มอบหมาย",
     })),
     departments: depts.map((d) => d.name),
     systems: systems.map((s) => `${s.name} [${s.code}]`),
@@ -340,7 +378,10 @@ ${dbSchema}
 - Ticket ของฉัน: ${snap.myTickets} ใบ
 
 Ticket ล่าสุด 5 ใบ:
-${snap.recentTickets.map((t) => `• ${t.system} "${t.title}" — ${t.status} (${t.priority})`).join("\n")}
+${snap.recentTickets.map((t) => `• ${t.system} "${t.title}" — ${t.status} (${t.priority}) ผู้รับผิดชอบ: ${t.assignedTo}`).join("\n")}
+
+งานที่ยังไม่เสร็จ (Pending/Open/In Progress) สูงสุด 15 ใบ:
+${snap.pendingTickets.map((t) => `• ${t.system} "${t.title}" — ${t.status} (${t.priority}) ผู้รับผิดชอบ: ${t.assignedTo} วันที่ ${t.createdAt}`).join("\n")}
 
 ระบบ: ${snap.systems.join(", ") || "ไม่มี"}
 แผนก: ${snap.departments.join(", ") || "ไม่มี"}`;
@@ -367,7 +408,10 @@ ${dbSchema}
 - Ticket ของฉัน: ${snap.myTickets} ใบ
 
 Ticket ล่าสุด 5 ใบ:
-${snap.recentTickets.map((t) => `• ${t.system} "${t.title}" — ${t.status} (${t.priority}) วันที่ ${t.createdAt}`).join("\n")}
+${snap.recentTickets.map((t) => `• ${t.system} "${t.title}" — ${t.status} (${t.priority}) ผู้รับผิดชอบ: ${t.assignedTo} วันที่ ${t.createdAt}`).join("\n")}
+
+งานที่ยังไม่เสร็จ (Pending/Open/In Progress) สูงสุด 15 ใบ:
+${snap.pendingTickets.map((t) => `• ${t.system} "${t.title}" — ${t.status} (${t.priority}) ผู้รับผิดชอบ: ${t.assignedTo} วันที่ ${t.createdAt}`).join("\n")}
 
 ระบบที่มี: ${snap.systems.join(", ") || "ยังไม่มี"}
 แผนก: ${snap.departments.join(", ") || "ยังไม่มี"}

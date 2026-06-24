@@ -87,8 +87,8 @@ export default function SystemsPage() {
       color: sys.color || "#3B82F6",
       icon: sys.icon || "⚙️",
       defaultAssigneeId: sys.defaultAssignee?.id || "",
-      lineOaToken: sys.lineOaToken || "",
-      lineOaSecret: sys.lineOaSecret || "",
+      lineOaToken: sys.lineOaToken ? "●●●●●●●●●●" : "",
+      lineOaSecret: sys.lineOaSecret ? "●●●●●●●●●●" : "",
       isDefault: sys.isDefault || false,
     });
     setShowForm(false);
@@ -103,19 +103,26 @@ export default function SystemsPage() {
       return;
     }
     setSaving(true);
+
+    const payload: any = {
+      name: editForm.name,
+      description: editForm.description || null,
+      color: editForm.color,
+      icon: editForm.icon,
+      defaultAssigneeId: editForm.defaultAssigneeId || null,
+      isDefault: editForm.isDefault,
+    };
+    if (editForm.lineOaToken !== "●●●●●●●●●●") {
+      payload.lineOaToken = editForm.lineOaToken || null;
+    }
+    if (editForm.lineOaSecret !== "●●●●●●●●●●") {
+      payload.lineOaSecret = editForm.lineOaSecret || null;
+    }
+
     const res = await fetch(`/api/systems/${editingSystem.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: editForm.name,
-        description: editForm.description || null,
-        color: editForm.color,
-        icon: editForm.icon,
-        defaultAssigneeId: editForm.defaultAssigneeId || null,
-        lineOaToken: editForm.lineOaToken || null,
-        lineOaSecret: editForm.lineOaSecret || null,
-        isDefault: editForm.isDefault,
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (!res.ok) {

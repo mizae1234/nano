@@ -98,10 +98,18 @@ export function menuFlex(plan: Plan, bot?: BotMeta, menuMessage?: string) {
       type: "bubble", size: "kilo",
       header: headerBox("เมนูหลัก", themeColor, botName),
       body: {
-        type: "box", layout: "vertical", paddingAll: "12px",
+        type: "box", layout: "vertical", paddingAll: "12px", spacing: "xs",
         contents: [
-          { type: "text", text: menuMessage || `เลือกสิ่งที่ต้องการ${botPersona} 😊`, size: "sm", color: "#555555", margin: "sm" },
-          { type: "text", text: "💡 พิมพ์ \"แจ้ง [ระบบ] ปัญหา\" เพื่อสร้าง ticket", size: "xxs", color: "#aaaaaa", margin: "xs", wrap: true },
+          { type: "text", text: menuMessage || `เลือกสิ่งที่ต้องการ${botPersona} 😊`, size: "sm", color: "#333333", weight: "bold" },
+          { type: "separator", margin: "sm" },
+          { type: "text", text: "💬 แชทส่วนตัว (พิมพ์สั่งได้ทันที):", size: "xs", color: "#555555", weight: "bold", margin: "sm" },
+          { type: "text", text: "• สร้างตั๋ว: แจ้ง [ระบบ] [รายละเอียด]\n   เช่น: แจ้ง it คอมเปิดไม่ติด", size: "xxs", color: "#666666", wrap: true },
+          { type: "text", text: "• ดูตั๋วของคุณ: พิมพ์ \"ดูตั๋ว\"", size: "xxs", color: "#666666" },
+          { type: "text", text: "• เช็คสถานะ: พิมพ์ \"สถานะ #1\"", size: "xxs", color: "#666666" },
+          ...(plan === "PRO" || plan === "ENTERPRISE" ? [{ type: "text" as const, text: "• ถาม AI: ถาม [คำถาม]\n   เช่น: ถาม มีตั๋วค้างกี่ใบ", size: "xxs" as const, color: "#666666" as const, wrap: true }] : []),
+          { type: "separator", margin: "md" },
+          { type: "text", text: "👥 คุยในกลุ่ม (ใส่ชื่อนำหน้า):", size: "xs", color: "#555555", weight: "bold" },
+          { type: "text", text: "พิมพ์ \"นาโน\" ตามด้วยคำสั่ง เช่น \"นาโน แจ้งแอร์เสีย\" หรือพิมพ์ \"นาโน ช่วย\" เพื่อเปิดเมนูกลุ่ม", size: "xxs", color: "#666666", wrap: true },
         ],
       },
       footer: { type: "box", layout: "vertical", contents: actions, spacing: "sm", paddingAll: "12px" },
@@ -128,9 +136,18 @@ export function groupMenuFlex(plan: Plan, systemName?: string, bot?: BotMeta) {
       type: "bubble", size: "kilo",
       header: headerBox(`เมนู Group${label}`, themeColor, botName),
       body: {
-        type: "box", layout: "vertical", paddingAll: "12px",
+        type: "box", layout: "vertical", paddingAll: "12px", spacing: "xs",
         contents: [
-          { type: "text", text: `พิมพ์ "นาโน" ตามด้วยคำสั่ง${botPersona}`, size: "sm", color: "#555555", wrap: true },
+          { type: "text", text: "👥 คุยกับน้องนาโนในกลุ่มไลน์:", size: "xs", color: "#333333", weight: "bold" },
+          { type: "text", text: "ต้องพิมพ์ \"นาโน\" หรือ \"@นาโน\" นำหน้าคำสั่ง", size: "xxs", color: "#555555", wrap: true },
+          { type: "separator", margin: "sm" },
+          { type: "text", text: "• สร้างตั๋ว: นาโน แจ้ง [รายละเอียด]\n   เช่น: นาโน แจ้ง แอร์เสีย", size: "xxs", color: "#666666", wrap: true },
+          { type: "text", text: "• ดูตั๋วทั้งหมดในกลุ่ม: นาโน ดูตั๋ว", size: "xxs", color: "#666666" },
+          { type: "text", text: "• สรุปงานในกลุ่ม: นาโน สรุป", size: "xxs", color: "#666666" },
+          { type: "text", text: "• เช็คสถานะ: นาโน สถานะ #[หมายเลข]", size: "xxs", color: "#666666" },
+          { type: "separator", margin: "md" },
+          { type: "text", text: "💬 สำหรับคุยแชทส่วนตัว:", size: "xs", color: "#555555", weight: "bold" },
+          { type: "text", text: "สามารถพิมพ์คุยหรือสั่งการได้ทันทีโดยไม่ต้องพิมพ์คำว่า \"นาโน\"", size: "xxs", color: "#666666", wrap: true },
         ],
       },
       footer: { type: "box", layout: "vertical", contents: actions, spacing: "sm", paddingAll: "12px" },
@@ -765,3 +782,21 @@ export function broadcastFlex(messageText: string, bot?: BotMeta) {
     }
   };
 }
+
+export function toCarouselFlex(cards: any[], altText: string) {
+  const bubbles = cards.map((card) => {
+    if (card && card.type === "flex" && card.contents) {
+      return card.contents;
+    }
+    return card;
+  });
+  return {
+    type: "flex",
+    altText,
+    contents: {
+      type: "carousel",
+      contents: bubbles.filter(Boolean),
+    },
+  };
+}
+

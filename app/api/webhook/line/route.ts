@@ -16,6 +16,7 @@ import {
   systemSelectFlex,
   followTicketFlex,
   groupSummaryFlex,
+  toCarouselFlex,
 } from "@/lib/nano-reply";
 
 /**
@@ -401,14 +402,14 @@ export async function POST(request: NextRequest) {
             const guideCard = groupMenuFlex(tenant.plan, systemName, botMeta);
             await reply(
               systemsCard 
-                ? [guideCard as never, systemsCard as never] 
+                ? [toCarouselFlex([guideCard, systemsCard], "เมนูหลัก") as never] 
                 : [guideCard as never]
             );
           } else {
             const guideCard = menuFlex(tenant.plan, botMeta, menuMsg);
             await reply(
               systemsCard 
-                ? [guideCard as never, systemsCard as never] 
+                ? [toCarouselFlex([guideCard, systemsCard], "เมนูหลัก") as never] 
                 : [guideCard as never]
             );
           }
@@ -424,10 +425,11 @@ export async function POST(request: NextRequest) {
           }
 
           if (!action.text) {
+            const sysCode = action.systemCode ? action.systemCode.toLowerCase() : "ชื่อระบบ";
             await reply([
               {
                 type: "text",
-                text: 'กรุณาพิมพ์ "แจ้งปัญหา [ชื่อระบบ] รายละเอียด" ค่ะ\nตัวอย่าง: แจ้งปัญหา [hris] ระบบลาไม่ทำงาน',
+                text: `กรุณาพิมพ์ "แจ้ง [${sysCode}] [รายละเอียดปัญหา]" ค่ะ\nตัวอย่าง: แจ้ง [${sysCode}] ระบบใช้งานไม่ได้`,
               } as never,
             ]);
             break;
