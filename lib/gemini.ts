@@ -48,7 +48,7 @@ export async function analyzeTicket(
   rawText: string,
   categories: string[],
   apiKey: string,
-  model: string = "gemini-2.0-flash"
+  model: string = "gemini-2.5-flash-preview-05-20"
 ): Promise<TicketAnalysis> {
   // sanitize — ตัด special characters ที่อาจ inject prompt
   const sanitized = rawText
@@ -170,7 +170,7 @@ export async function queryDatabase(
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: context.aiModel || "gemini-2.0-flash",
+    model: context.aiModel || "gemini-2.5-flash-preview-05-20",
   });
 
   try {
