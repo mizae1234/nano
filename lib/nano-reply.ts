@@ -296,7 +296,7 @@ export function ticketCreatedWithAIFlex(
 //  TICKET LIST (Carousel)
 // ══════════════════════════════════════════════════════════════
 
-export function ticketListFlex(tickets: TicketInfo[], baseUrl: string, bot?: BotMeta) {
+export function ticketListFlex(tickets: TicketInfo[], baseUrl: string, allTicketsUrl?: string, bot?: BotMeta) {
   const { botName, botPersona, themeColor } = meta(bot);
   if (tickets.length === 0) {
     return {
@@ -314,7 +314,7 @@ export function ticketListFlex(tickets: TicketInfo[], baseUrl: string, bot?: Bot
       },
     };
   }
-  const bubbles = tickets.slice(0, 10).map((ticket) => {
+  const bubbles = tickets.slice(0, 3).map((ticket) => {
     const ticketRef = ticket.systemPrefix ? `${ticket.systemPrefix}-${ticket.ticketNo}` : `#${ticket.ticketNo}`;
     return {
       type: "bubble", size: "kilo",
@@ -349,6 +349,59 @@ export function ticketListFlex(tickets: TicketInfo[], baseUrl: string, bot?: Bot
       },
     };
   });
+
+  if (allTicketsUrl) {
+    bubbles.push({
+      type: "bubble", size: "kilo",
+      header: {
+        type: "box", layout: "vertical",
+        contents: [
+          { type: "text", text: "🔍 ดูตั๋วทั้งหมด", color: "#ffffff", size: "sm", weight: "bold" }
+        ],
+        backgroundColor: themeColor, paddingAll: "10px"
+      },
+      body: {
+        type: "box", layout: "vertical", paddingAll: "12px", spacing: "md",
+        justifyContent: "center",
+        contents: [
+          { 
+            type: "text", 
+            text: `พบตั๋วงานในระบบทั้งหมด\nจำนวน ${tickets.length} รายการ`, 
+            size: "sm", 
+            align: "center", 
+            wrap: true, 
+            weight: "bold",
+            color: "#333333" 
+          },
+          { 
+            type: "text", 
+            text: "คุณสามารถล็อกอินเข้าสู่ระบบผ่านลิงก์ด้านล่าง เพื่อเปิดดูตั๋วงาน ค้นหา หรือจัดการรายการทั้งหมดผ่านหน้าเว็บสตรีมได้เลยค่ะ 😊", 
+            size: "xxs", 
+            color: "#666666", 
+            align: "center", 
+            wrap: true 
+          }
+        ]
+      },
+      footer: {
+        type: "box", layout: "vertical", paddingAll: "8px",
+        contents: [
+          { 
+            type: "button", 
+            action: { 
+              type: "uri", 
+              label: "🌐 เปิดดูตั๋วทั้งหมด", 
+              uri: allTicketsUrl 
+            }, 
+            style: "primary", 
+            color: themeColor, 
+            height: "sm" 
+          }
+        ]
+      }
+    } as any);
+  }
+
   return {
     type: "flex", altText: `ตั๋ว (${tickets.length} รายการ)`,
     contents: { type: "carousel", contents: bubbles },

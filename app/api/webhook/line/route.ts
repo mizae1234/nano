@@ -771,6 +771,7 @@ export async function POST(request: NextRequest) {
             ticketWhere.OR = [
               { createdById: user.id },
               { assignedToId: user.id },
+              ...(user.departmentId ? [{ departmentId: user.departmentId, assignedToId: null }] : []),
             ];
           } else if (user.role === "DEPT_ADMIN" && user.departmentId) {
             ticketWhere.departmentId = user.departmentId;
@@ -789,6 +790,14 @@ export async function POST(request: NextRequest) {
             take: 10,
           });
 
+          let redirectPath = "/ticket";
+          if (user.role === "IT") {
+            redirectPath = "/it";
+          } else if (user.role === "DEPT_ADMIN") {
+            redirectPath = "/dept";
+          }
+          const allTicketsUrl = `${appUrl}/login?redirect=${encodeURIComponent(redirectPath)}&tenant=${tenant.slug}`;
+
           await reply([
             ticketListFlex(
               tickets.map((t) => ({
@@ -805,6 +814,7 @@ export async function POST(request: NextRequest) {
                 createdAt: t.createdAt.toLocaleDateString("th-TH"),
               })),
               appUrl,
+              allTicketsUrl,
               botMeta
             ) as never,
           ]);
