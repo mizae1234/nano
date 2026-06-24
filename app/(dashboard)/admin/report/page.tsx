@@ -205,7 +205,7 @@ export default function AdminReportPage() {
     }
   };
 
-  const handleExportCsv = async () => {
+  const handleExportExcel = async () => {
     setExporting(true);
     try {
       let url = `/api/report?detail=true&period=${period}&departmentId=${deptFilter}&status=${statusFilter}`;
@@ -225,7 +225,7 @@ export default function AdminReportPage() {
         return;
       }
 
-      // หัวตาราง CSV
+      // หัวตาราง Excel
       const headers = [
         "หมายเลขตั๋ว",
         "หัวข้อ",
@@ -241,10 +241,10 @@ export default function AdminReportPage() {
         "เวลาที่ใช้ (SLA Hours)"
       ];
 
-      // แปลงข้อมูลเป็นแถว CSV
+      // แปลงข้อมูลเป็นแถว Excel
       const rows = ticketsToExport.map((t) => {
         const ticketId = `${t.system?.ticketPrefix || "TKT"}-${t.ticketNo}`;
-        const title = t.title.replace(/"/g, '""'); // หลบฟันหนูในข้อความ
+        const title = t.title;
         const creator = t.createdBy.displayName;
         const dept = t.department?.name || "-";
         const assignee = t.assignedTo?.displayName || "-";
@@ -255,41 +255,54 @@ export default function AdminReportPage() {
         const resolvedAtStr = t.resolvedAt ? new Date(t.resolvedAt).toLocaleString("th-TH") : "-";
         const dueDateStr = t.dueDate ? new Date(t.dueDate).toLocaleDateString("th-TH") : "-";
         
-        let slaHours = "-";
+        let slaHours: string | number = "-";
         if (t.resolvedAt) {
           const diffMs = new Date(t.resolvedAt).getTime() - new Date(t.createdAt).getTime();
           const hours = diffMs / (1000 * 60 * 60);
-          slaHours = hours.toFixed(1);
+          slaHours = parseFloat(hours.toFixed(1));
         }
 
         return [
-          `"${ticketId}"`,
-          `"${title}"`,
-          `"${creator}"`,
-          `"${dept}"`,
-          `"${assignee}"`,
-          `"${priority}"`,
-          `"${status}"`,
-          `"${category}"`,
-          `"${createdAtStr}"`,
-          `"${resolvedAtStr}"`,
-          `"${dueDateStr}"`,
-          `"${slaHours}"`
+          ticketId,
+          title,
+          creator,
+          dept,
+          assignee,
+          priority,
+          status,
+          category,
+          createdAtStr,
+          resolvedAtStr,
+          dueDateStr,
+          slaHours
         ];
       });
 
-      // จัดเรียงหัวข้อและแถวเข้าด้วยกันคั่นด้วย comma และขึ้นบรรทัดใหม่ พร้อม BOM
-      const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+      // ใช้ xlsx ในการสร้างไฟล์
+      const XLSX = await import("xlsx");
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
-      // สั่งดาวน์โหลด
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const urlBlob = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", urlBlob);
-      link.setAttribute("download", `sla_report_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // กำหนดความกว้างของคอลัมน์แบบพอดีคำคร่าวๆ
+      ws["!cols"] = [
+        { wch: 12 }, // หมายเลขตั๋ว
+        { wch: 35 }, // หัวข้อ
+        { wch: 18 }, // ผู้แจ้ง
+        { wch: 15 }, // แผนกที่ดูแล
+        { wch: 18 }, // ผู้รับผิดชอบ
+        { wch: 12 }, // ความสำคัญ
+        { wch: 15 }, // สถานะ
+        { wch: 15 }, // หมวดหมู่
+        { wch: 20 }, // วันเวลาที่สร้าง
+        { wch: 20 }, // วันเวลาที่แก้ไขเสร็จ
+        { wch: 15 }, // กำหนดเสร็จ
+        { wch: 12 }, // SLA Hours
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "รายงานตั๋วงาน");
+
+      // สั่งดาวน์โหลดไฟล์ Excel (.xlsx)
+      XLSX.writeFile(wb, `sla_report_${new Date().toISOString().split('T')[0]}.xlsx`);
 
     } catch (error) {
       console.error("Export error:", error);
