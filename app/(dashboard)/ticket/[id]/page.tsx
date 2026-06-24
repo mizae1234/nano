@@ -153,10 +153,8 @@ export default function TicketDetailPage() {
         setUsers(usersRes || []);
         setDepartments(deptRes || []);
 
-        if (ticketRes.departmentId) {
-          const catRes = await fetch(`/api/categories?departmentId=${ticketRes.departmentId}`).then((r) => r.json());
-          setCategories(catRes || []);
-        }
+        const catRes = await fetch(`/api/categories?departmentId=${ticketRes.departmentId || ""}`).then((r) => r.json());
+        setCategories(catRes || []);
       }
 
       // โหลดรายชื่อกลุ่มไลน์เสมอ เพื่อนำมาเลือกเป็นช่องทางการแจ้งเตือน
@@ -172,12 +170,8 @@ export default function TicketDetailPage() {
   }
 
   // โหลดหมวดหมู่ตามแผนกเมื่อมีการเลือกแผนกใหม่
-  async function loadCategoriesForDept(deptId: string) {
-    if (!deptId) {
-      setCategories([]);
-      return;
-    }
-    const catRes = await fetch(`/api/categories?departmentId=${deptId}`).then((r) => r.json());
+  async function loadCategoriesForDept(deptId: string | null) {
+    const catRes = await fetch(`/api/categories?departmentId=${deptId || ""}`).then((r) => r.json());
     setCategories(catRes || []);
   }
 
@@ -543,7 +537,7 @@ export default function TicketDetailPage() {
                   className="input-field text-sm !py-1"
                   value={ticket.categoryId || ""}
                   onChange={(e) => handleUpdateField("categoryId", e.target.value || null)}
-                  disabled={updating || !ticket.departmentId}
+                  disabled={updating}
                 >
                   <option value="">-- เลือกหมวดหมู่ --</option>
                   {categories.map((cat) => (
