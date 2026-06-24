@@ -1050,8 +1050,14 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          const now = new Date();
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
           const statsWhere: Record<string, any> = {
             tenantId: tenant.id,
+            createdAt: {
+              gte: startOfMonth,
+            },
           };
           if (targetSystemId) {
             statsWhere.systemId = targetSystemId;

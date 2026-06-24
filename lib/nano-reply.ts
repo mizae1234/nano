@@ -422,10 +422,10 @@ export function groupSummaryFlex(stats: { open: number; inProgress: number; pend
   const { botName, themeColor } = meta(bot);
   const label = systemName || "ทั้งหมด";
   return {
-    type: "flex", altText: `📊 สรุปงาน ${label}`,
+    type: "flex", altText: `📊 สรุปงานเดือนนี้ ${label}`,
     contents: {
       type: "bubble", size: "kilo",
-      header: headerBox(`📊 สรุปงาน ${label}`, themeColor, botName),
+      header: headerBox(`📊 สรุปงานเดือนนี้ (${label})`, themeColor, botName),
       body: {
         type: "box", layout: "vertical", paddingAll: "12px", spacing: "sm",
         contents: [
@@ -719,8 +719,8 @@ export function getQuickReply(sourceType: "user" | "group" | "room") {
         type: "action",
         action: {
           type: "message",
-          label: "📊 สรุปงาน",
-          text: `${prefix}สรุป`
+          label: "📊 สรุปงานเดือนนี้",
+          text: `${prefix}สรุปเดือนนี้`
         }
       },
       {
