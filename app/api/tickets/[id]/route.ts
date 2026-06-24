@@ -117,8 +117,10 @@ export async function PATCH(
     if (body.status && body.status !== ticket.status) {
       updateData.status = body.status;
       auditDetails.push(`เปลี่ยนสถานะเป็น ${body.status}`);
-      if (body.status === "RESOLVED") {
-        updateData.resolvedAt = new Date();
+      if (body.status === "RESOLVED" || body.status === "CLOSED") {
+        if (!ticket.resolvedAt) {
+          updateData.resolvedAt = new Date();
+        }
       }
     }
 

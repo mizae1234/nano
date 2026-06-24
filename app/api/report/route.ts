@@ -23,32 +23,99 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const period = searchParams.get("period") || "month";
     const deptId = searchParams.get("departmentId");
+    const statusFilter = searchParams.get("status");
+    const searchFilter = searchParams.get("search");
+    const detailParam = searchParams.get("detail") === "true";
 
     // คำนวณช่วงเวลา (Date filter)
-    const now = new Date();
-    let startDate = new Date();
-    if (period === "week") {
-      startDate.setDate(now.getDate() - 7);
-    } else if (period === "quarter") {
-      startDate.setDate(now.getDate() - 90);
-    } else if (period === "year") {
-      startDate.setDate(now.getDate() - 365);
+    let dateFilter: any = undefined;
+    if (period === "all") {
+      // ไม่ใส่ฟิลเตอร์วันที่
+    } else if (period === "custom") {
+      const startStr = searchParams.get("startDate");
+      const endStr = searchParams.get("endDate");
+      if (startStr || endStr) {
+        dateFilter = {};
+        if (startStr) {
+          const sDate = new Date(startStr);
+          sDate.setHours(0, 0, 0, 0);
+          dateFilter.gte = sDate;
+        }
+        if (endStr) {
+          const eDate = new Date(endStr);
+          eDate.setHours(23, 59, 59, 999);
+          dateFilter.lte = eDate;
+        }
+      }
     } else {
-      // default: month (30 วัน)
-      startDate.setDate(now.getDate() - 30);
+      const now = new Date();
+      const startDate = new Date();
+      if (period === "week") {
+        startDate.setDate(now.getDate() - 7);
+      } else if (period === "quarter") {
+        startDate.setDate(now.getDate() - 90);
+      } else if (period === "year") {
+        startDate.setDate(now.getDate() - 365);
+      } else {
+        // default: month (30 วัน)
+        startDate.setDate(now.getDate() - 30);
+      }
+      startDate.setHours(0, 0, 0, 0);
+      dateFilter = { gte: startDate };
     }
 
     // สร้าง dynamic where clause
-    const where: Record<string, unknown> = {
+    const where: Record<string, any> = {
       tenantId,
-      createdAt: { gte: startDate },
     };
+
+    if (dateFilter) {
+      where.createdAt = dateFilter;
+    }
 
     if (deptId && deptId !== "all") {
       where.departmentId = deptId;
     }
 
-    // ดึงข้อมูล Tickets ทั้งหมดในช่วงเวลานั้น
+    if (statusFilter && statusFilter !== "all") {
+      where.status = statusFilter;
+    }
+
+    if (searchFilter?.trim()) {
+      const isNum = !isNaN(Number(searchFilter));
+      where.OR = [
+        { title: { contains: searchFilter, mode: "insensitive" } },
+        { description: { contains: searchFilter, mode: "insensitive" } },
+        { createdBy: { displayName: { contains: searchFilter, mode: "insensitive" } } },
+        { assignedTo: { displayName: { contains: searchFilter, mode: "insensitive" } } },
+      ];
+      if (isNum) {
+        where.OR.push({ ticketNo: Number(searchFilter) });
+      }
+    }
+
+    // หากต้องการข้อมูลรายงานละเอียด
+    if (detailParam) {
+      const detailedTickets = await prisma.ticket.findMany({
+        where,
+        include: {
+          createdBy: { select: { displayName: true } },
+          assignedTo: { select: { displayName: true } },
+          department: { select: { name: true } },
+          system: { select: { ticketPrefix: true } },
+          category: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return NextResponse.json({ tickets: detailedTickets });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // โหมดภาพรวม (Summary Mode)
+    // ─────────────────────────────────────────────────────────────
+
+    // ดึงข้อมูล Tickets ทั้งหมดตามเงื่อนไขที่กรองไว้
     const tickets = await prisma.ticket.findMany({
       where,
       select: {
@@ -92,12 +159,16 @@ export async function GET(request: NextRequest) {
 
     const deptStats = await Promise.all(
       departments.map(async (d) => {
+        const dWhere: Record<string, any> = {
+          tenantId,
+          departmentId: d.id,
+        };
+        if (dateFilter) {
+          dWhere.createdAt = dateFilter;
+        }
+
         const dTickets = await prisma.ticket.findMany({
-          where: {
-            tenantId,
-            departmentId: d.id,
-            createdAt: { gte: startDate },
-          },
+          where: dWhere,
           select: { id: true, status: true, createdAt: true, resolvedAt: true },
         });
 

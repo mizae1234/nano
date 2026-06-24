@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma";
 import { hasMinRole } from "@/lib/tenant";
 import { Role } from "@prisma/client";
 import { pushMessage } from "@/lib/line";
+import { broadcastFlex } from "@/lib/nano-reply";
 
 // POST /api/admin/broadcast — ส่ง Broadcast หา LINE Group หรือ User
 export async function POST(request: NextRequest) {
@@ -37,7 +38,17 @@ export async function POST(request: NextRequest) {
 
     const tenant = await prisma.tenant.findUnique({
       where: { id: session.tenantId },
-      select: { id: true, lineOaToken: true },
+      select: {
+        id: true,
+        lineOaToken: true,
+        botConfig: {
+          select: {
+            botName: true,
+            botPersona: true,
+            themeColor: true,
+          },
+        },
+      },
     });
 
     if (!tenant || !tenant.lineOaToken) {
@@ -58,10 +69,13 @@ export async function POST(request: NextRequest) {
         select: { id: true, lineGroupId: true, name: true },
       });
 
+      const botMeta = tenant.botConfig || undefined;
+      const flexPayload = broadcastFlex(messageText, botMeta);
+
       for (const group of groups) {
         try {
           await pushMessage(tenant.lineOaToken, group.lineGroupId, [
-            { type: "text", text: messageText } as any,
+            flexPayload as any,
           ]);
 
           // บันทึก ChatLog (OUTGOING)
@@ -94,12 +108,15 @@ export async function POST(request: NextRequest) {
         select: { id: true, lineUid: true, displayName: true },
       });
 
+      const botMeta = tenant.botConfig || undefined;
+      const flexPayload = broadcastFlex(messageText, botMeta);
+
       for (const user of users) {
         try {
           if (!user.lineUid) continue;
 
           await pushMessage(tenant.lineOaToken, user.lineUid, [
-            { type: "text", text: messageText } as any,
+            flexPayload as any,
           ]);
 
           // บันทึก ChatLog (OUTGOING)

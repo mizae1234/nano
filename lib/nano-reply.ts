@@ -708,3 +708,60 @@ export function getQuickReply(sourceType: "user" | "group" | "room") {
     ]
   };
 }
+
+// ══════════════════════════════════════════════════════════════
+//  BROADCAST FLEX MESSAGE ✨
+// ══════════════════════════════════════════════════════════════
+
+export function broadcastFlex(messageText: string, bot?: BotMeta) {
+  const { botName, themeColor } = meta(bot);
+  const cleanBotName = botName.replace("🤖 ", "");
+  
+  return {
+    type: "flex",
+    altText: `📣 ประกาศจาก${cleanBotName}`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          { type: "text", text: "📣 ข่าวสารประชาสัมพันธ์", color: "#ffffff", size: "xxs", weight: "bold", opacity: 0.8 },
+          { type: "text", text: `ประกาศจาก ${cleanBotName}`, color: "#ffffff", size: "md", weight: "bold", margin: "xs" }
+        ],
+        backgroundColor: themeColor,
+        paddingAll: "12px"
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "16px",
+        contents: [
+          {
+            type: "text",
+            text: messageText,
+            size: "sm",
+            color: "#333333",
+            wrap: true,
+            lineSpacing: "4px"
+          }
+        ]
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "8px",
+        contents: [
+          {
+            type: "text",
+            text: "ระบบ Service Ticket",
+            size: "xxs",
+            color: "#aaaaaa",
+            align: "center"
+          }
+        ]
+      }
+    }
+  };
+}
