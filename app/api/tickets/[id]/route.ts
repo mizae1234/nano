@@ -88,15 +88,25 @@ export async function PATCH(
       return NextResponse.json({ error: "ไม่พบ Ticket" }, { status: 404 });
     }
 
-    // ต้องเป็น IT ขึ้นไปถึงจะแก้ไข ticket ได้
-    if (!hasMinRole(session.role as Role, "IT")) {
-      return NextResponse.json(
-        { error: "ไม่มีสิทธิ์แก้ไข Ticket" },
-        { status: 403 }
-      );
+    const body = await request.json();
+
+    // ต้องเป็น IT ขึ้นไป หรือ เป็นผู้สร้าง ticket และแก้ไขสถานะเป็น CLOSED เท่านั้น
+    const isIT = hasMinRole(session.role as Role, "IT");
+    const isCreator = session.id === ticket.createdById;
+
+    if (!isIT) {
+      const keys = Object.keys(body);
+      const isOnlyUpdatingStatusToClosed =
+        keys.length === 1 && keys[0] === "status" && body.status === "CLOSED";
+
+      if (!isCreator || !isOnlyUpdatingStatusToClosed) {
+        return NextResponse.json(
+          { error: "ไม่มีสิทธิ์แก้ไข Ticket" },
+          { status: 403 }
+        );
+      }
     }
 
-    const body = await request.json();
     const updateData: Record<string, unknown> = {};
     const auditDetails: string[] = [];
 

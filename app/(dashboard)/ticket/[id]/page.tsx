@@ -437,7 +437,7 @@ export default function TicketDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          {/* Status (สำหรับ IT+ หรือสามารถอัปเดตได้) */}
+          {/* Status (สำหรับ IT+ หรือผู้สร้างปิดตั๋วได้) */}
           <div className="card">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">สถานะ</h3>
             {isIT ? (
@@ -452,9 +452,26 @@ export default function TicketDetailPage() {
                 ))}
               </select>
             ) : (
-              <span className={`badge ${statusInfo.color} block text-center py-1.5 text-sm`}>
-                {statusInfo.label}
-              </span>
+              <div className="space-y-3">
+                <span className={`badge ${statusInfo.color} block text-center py-1.5 text-sm w-full font-semibold`}>
+                  {statusInfo.label}
+                </span>
+
+                {sessionUser?.id === ticket.createdBy.id && ticket.status !== "CLOSED" && (
+                  <button
+                    onClick={() => {
+                      if (confirm("คุณต้องการปิดตั๋วงานนี้ใช่หรือไม่?")) {
+                        handleUpdateField("status", "CLOSED");
+                      }
+                    }}
+                    disabled={updating}
+                    className="w-full btn-danger text-xs py-2 flex items-center justify-center gap-1.5 shadow-sm hover:shadow transition-all font-semibold"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    ปิดตั๋วงาน (Close Ticket)
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
