@@ -45,12 +45,12 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  { label: "ปัญหาของฉัน", href: "/ticket", icon: Ticket, roles: ["USER", "IT", "DEPT_ADMIN", "ADMIN", "SUPER_ADMIN"] },
+  { label: "Kanban บอร์ด", href: "/ticket", icon: Ticket, roles: ["USER", "IT", "DEPT_ADMIN", "ADMIN", "SUPER_ADMIN"] },
   { label: "แจ้งปัญหาใหม่", href: "/ticket/new", icon: PlusCircle, roles: ["USER", "IT", "DEPT_ADMIN", "ADMIN", "SUPER_ADMIN"] },
   { label: "คิวงาน IT", href: "/it", icon: Wrench, roles: ["IT", "DEPT_ADMIN", "ADMIN", "SUPER_ADMIN"] },
   { label: "Ticket ในแผนก", href: "/dept", icon: FolderOpen, roles: ["DEPT_ADMIN", "ADMIN", "SUPER_ADMIN"] },
   { label: "สมาชิกในแผนก", href: "/dept/members", icon: Users, roles: ["DEPT_ADMIN", "ADMIN", "SUPER_ADMIN"] },
-  { label: "ทุก Ticket", href: "/admin", icon: LayoutDashboard, roles: ["ADMIN", "SUPER_ADMIN"] },
+  { label: "Dashboard", href: "/admin", icon: LayoutDashboard, roles: ["ADMIN", "SUPER_ADMIN"] },
   { label: "จัดการระบบ", href: "/admin/systems", icon: Server, roles: ["ADMIN", "SUPER_ADMIN"] },
   { label: "จัดการ Group", href: "/admin/groups", icon: MessageSquare, roles: ["ADMIN", "SUPER_ADMIN"] },
   { label: "จัดการผู้ใช้", href: "/admin/users", icon: Users, roles: ["ADMIN", "SUPER_ADMIN"] },
