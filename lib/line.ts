@@ -193,3 +193,25 @@ export async function getLineGroupSummary(
 
   return res.json();
 }
+
+/**
+ * ดึง profile สมาชิกกลุ่ม LINE
+ */
+export async function getLineGroupMemberProfile(
+  encryptedToken: string,
+  groupId: string,
+  userId: string
+): Promise<LineProfile> {
+  const token = decrypt(encryptedToken);
+  const res = await fetch(`https://api.line.me/v2/bot/group/${groupId}/member/${userId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`ไม่สามารถดึงข้อมูล LINE Group Member profile ได้: ${res.statusText}`);
+  }
+
+  return res.json();
+}

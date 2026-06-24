@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { validateLineSignature, replyMessage, getLineGroupSummary } from "@/lib/line";
+import { validateLineSignature, replyMessage, getLineGroupSummary, getLineProfile, getLineGroupMemberProfile } from "@/lib/line";
 import { parseNanoCommand } from "@/lib/nano-router";
 import { queryDatabase } from "@/lib/gemini";
 import {
@@ -227,12 +227,28 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // ─── ดึงชื่อโปรไฟล์กรณีที่ user ไม่มีอยู่ในระบบ หรือไม่มีชื่อ ────────
+      let displayName = user?.displayName || null;
+      if (!displayName && lineUid) {
+        try {
+          if (sourceType !== "user" && lineGroupId) {
+            const profile = await getLineGroupMemberProfile(tenant.lineOaToken!, lineGroupId, lineUid);
+            displayName = profile.displayName;
+          } else {
+            const profile = await getLineProfile(tenant.lineOaToken!, lineUid);
+            displayName = profile.displayName;
+          }
+        } catch (err) {
+          console.error("Failed to fetch LINE profile for log:", err);
+        }
+      }
+
       // ─── บันทึก ChatLog (INCOMING) ──────────────────────────
       await prisma.chatLog.create({
         data: {
           tenantId: tenant.id,
           lineUid,
-          displayName: user?.displayName || null,
+          displayName,
           lineGroupId,
           messageText,
           direction: "INCOMING",

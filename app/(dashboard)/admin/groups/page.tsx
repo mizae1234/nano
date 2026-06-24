@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { MessageSquare, Plus, Loader2, Check, X, Trash2, Pencil } from "lucide-react";
 

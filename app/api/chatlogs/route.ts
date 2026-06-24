@@ -41,6 +41,13 @@ export async function GET(request: NextRequest) {
       prisma.chatLog.count({ where }),
     ]);
 
+    // ดึงรายชื่อ GroupConfig ของ Tenant ทั้งหมดมาเก็บไว้เพื่อเอามา map ชื่อกลุ่ม
+    const groups = await prisma.groupConfig.findMany({
+      where: { tenantId: session.tenantId },
+      select: { lineGroupId: true, name: true },
+    });
+    const groupMap = new Map(groups.map((g) => [g.lineGroupId, g.name]));
+
     // สืบค้นข้อความตอบกลับของบอท (OUTGOING) สำหรับแต่ละคำถามขาเข้า
     const pairedLogs = await Promise.all(
       incomingLogs.map(async (log) => {
@@ -63,6 +70,7 @@ export async function GET(request: NextRequest) {
           lineUid: log.lineUid,
           displayName: log.displayName,
           lineGroupId: log.lineGroupId,
+          groupName: log.lineGroupId ? (groupMap.get(log.lineGroupId) || "กลุ่มไลน์ทั่วไป") : null,
           messageText: log.messageText, // ข้อความจากผู้ใช้
           botResponse: outgoing?.messageText || null, // คำตอบของบอท
           replyAction: outgoing?.replyAction || log.replyAction,

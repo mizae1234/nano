@@ -8,6 +8,7 @@ interface ChatLogItem {
   lineUid: string;
   displayName: string | null;
   lineGroupId: string | null;
+  groupName: string | null;
   messageText: string | null;
   botResponse: string | null;
   replyAction: string | null;
@@ -118,8 +119,8 @@ export default function ChatLogsPage() {
                         UID: {log.lineUid.slice(0, 10)}...
                       </div>
                       {log.lineGroupId && (
-                        <span className="inline-flex items-center text-[10px] px-2 py-0.5 mt-1 rounded bg-amber-50 text-amber-700 font-medium">
-                          👥 Group
+                        <span className="inline-flex items-center text-[10px] px-2 py-0.5 mt-1 rounded bg-amber-50 text-amber-700 font-medium truncate max-w-[180px]" title={log.groupName || log.lineGroupId}>
+                          👥 {log.groupName || "กลุ่มทั่วไป"}
                         </span>
                       )}
                     </td>
