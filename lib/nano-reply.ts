@@ -753,7 +753,7 @@ export function broadcastFlex(messageText: string, bot?: BotMeta) {
         type: "box",
         layout: "vertical",
         contents: [
-          { type: "text", text: "📣 ข่าวสารประชาสัมพันธ์", color: "#ffffff", size: "xxs", weight: "bold", opacity: 0.8 },
+          { type: "text", text: "📣 ข่าวสารประชาสัมพันธ์", color: "#ffffff", size: "xxs", weight: "bold" },
           { type: "text", text: `ประกาศจาก ${cleanBotName}`, color: "#ffffff", size: "md", weight: "bold", margin: "xs" }
         ],
         backgroundColor: themeColor,
