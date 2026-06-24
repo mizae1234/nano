@@ -265,6 +265,15 @@ export async function POST(request: NextRequest) {
 
       // Helper: wrapper to reply using context variables
       const reply = async (messages: any[], oaToken = tenant.lineOaToken!) => {
+        if (messages.length > 0) {
+          const lastMsg = messages[messages.length - 1];
+          try {
+            const { getQuickReply } = await import("@/lib/nano-reply");
+            lastMsg.quickReply = getQuickReply(sourceType);
+          } catch (err) {
+            console.error("Failed to append quickReply:", err);
+          }
+        }
         await replyAndLog(oaToken, event.replyToken, messages, lineUid, lineGroupId, action?.action || "REPLY");
       };
 
@@ -357,6 +366,18 @@ export async function POST(request: NextRequest) {
         }
 
         case "SHOW_MENU": {
+          const systems = await getTenantSystems();
+          let systemsCard: any = null;
+
+          if (systems.length > 0) {
+            const prefix = sourceType !== "user" ? "นาโน แจ้ง" : "แจ้ง";
+            systemsCard = systemSelectFlex(
+              systems.map((s) => ({ id: s.id, code: s.code, name: s.name, icon: s.icon, color: s.color })),
+              prefix,
+              botMeta
+            );
+          }
+
           if (sourceType !== "user") {
             let systemName: string | undefined;
             if (lineGroupId) {
@@ -377,9 +398,19 @@ export async function POST(request: NextRequest) {
                 }
               }
             }
-            await reply([groupMenuFlex(tenant.plan, systemName, botMeta) as never]);
+            const guideCard = groupMenuFlex(tenant.plan, systemName, botMeta);
+            await reply(
+              systemsCard 
+                ? [guideCard as never, systemsCard as never] 
+                : [guideCard as never]
+            );
           } else {
-            await reply([menuFlex(tenant.plan, botMeta, menuMsg) as never]);
+            const guideCard = menuFlex(tenant.plan, botMeta, menuMsg);
+            await reply(
+              systemsCard 
+                ? [guideCard as never, systemsCard as never] 
+                : [guideCard as never]
+            );
           }
           break;
         }

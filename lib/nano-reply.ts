@@ -664,3 +664,47 @@ export function ticketResolvedFlex(ticket: TicketInfo, detailUrl: string, bot?: 
     },
   };
 }
+
+// ══════════════════════════════════════════════════════════════
+//  QUICK REPLY MENU ✨
+// ══════════════════════════════════════════════════════════════
+
+export function getQuickReply(sourceType: "user" | "group" | "room") {
+  const prefix = sourceType !== "user" ? "นาโน " : "";
+  return {
+    items: [
+      {
+        type: "action",
+        action: {
+          type: "message",
+          label: "📋 เมนูคำสั่ง",
+          text: `${prefix}เมนู`
+        }
+      },
+      {
+        type: "action",
+        action: {
+          type: "message",
+          label: "📝 แจ้งปัญหา",
+          text: `${prefix}แจ้ง`
+        }
+      },
+      {
+        type: "action",
+        action: {
+          type: "message",
+          label: "📊 สรุปงาน",
+          text: `${prefix}สรุป`
+        }
+      },
+      {
+        type: "action",
+        action: {
+          type: "message",
+          label: "🔍 ดูตั๋วทั้งหมด",
+          text: `${prefix}ดูตั๋ว`
+        }
+      }
+    ]
+  };
+}

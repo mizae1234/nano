@@ -15,6 +15,7 @@ interface LineMessage {
   text?: string;
   altText?: string;
   contents?: unknown;
+  quickReply?: unknown;
 }
 
 /**

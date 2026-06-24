@@ -70,11 +70,25 @@ export function parseNanoCommand(
 ): NanoAction {
   let text = message.trim();
 
-  // Group/Room: require trigger word
+  // Group/Room: require trigger word OR exact bot command keywords
   if (sourceType !== "user") {
     const trigger = TRIGGERS.find((t) => text.toLowerCase().startsWith(t.toLowerCase()));
-    if (!trigger) return null;
-    text = text.slice(trigger.length).trim();
+    if (trigger) {
+      text = text.slice(trigger.length).trim();
+    } else {
+      // Check if the text matches any bot commands directly
+      const isCommand =
+        includes(text, GREETING_WORDS) ||
+        includes(text, MENU_WORDS) ||
+        includes(text, SYSTEMS_WORDS) ||
+        includes(text, LIST_TICKET_WORDS) ||
+        startsWith(text, STATUS_WORDS).match ||
+        startsWith(text, CLOSE_WORDS).match ||
+        startsWith(text, CREATE_WORDS).match ||
+        includes(text, SUMMARY_WORDS);
+
+      if (!isCommand) return null;
+    }
   }
 
   if (!text) return { action: "SHOW_MENU" };
