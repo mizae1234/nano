@@ -30,6 +30,8 @@ export default function DeptTicketsPage() {
   const [deptName, setDeptName] = useState("แผนกของคุณ");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -55,7 +57,24 @@ export default function DeptTicketsPage() {
       });
   }, []);
 
-  const filtered = filter === "all" ? tickets : tickets.filter((t) => t.status === filter);
+  const filtered = tickets.filter((t) => {
+    // 1. Status Filter
+    if (filter !== "all" && t.status !== filter) return false;
+
+    // 2. Date Range Filter
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      if (new Date(t.createdAt) < start) return false;
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      if (new Date(t.createdAt) > end) return false;
+    }
+
+    return true;
+  });
 
   if (loading) {
     return (
@@ -67,22 +86,48 @@ export default function DeptTicketsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-gray-100/50 shadow-sm">
+        <p className="text-sm text-gray-500 font-medium">
           Ticket ทั้งหมดในแผนก &quot;{deptName}&quot;
         </p>
-        <select
-          className="input-field !w-auto text-sm"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        >
-          <option value="all">ทุกสถานะ</option>
-          {Object.entries(STATUS).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Start Date */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">เริ่มต้น:</span>
+            <input
+              type="date"
+              className="input-field !w-auto text-sm !py-1.5 !px-3 cursor-pointer"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </div>
+          {/* End Date */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">สิ้นสุด:</span>
+            <input
+              type="date"
+              className="input-field !w-auto text-sm !py-1.5 !px-3 cursor-pointer"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </div>
+          {/* Status */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">สถานะ:</span>
+            <select
+              className="input-field !w-auto text-sm !py-1.5 !px-3 cursor-pointer"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
+              <option value="all">ทุกสถานะ</option>
+              {Object.entries(STATUS).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-3">
