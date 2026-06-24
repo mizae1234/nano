@@ -28,7 +28,7 @@ function LoginPageContent() {
         const url = new URL(redirectParam, window.location.origin);
         url.searchParams.set("tenant", tenantSlug);
         return url.pathname + url.search;
-      } catch (e) {
+      } catch {
         return `${redirectParam}${redirectParam.includes("?") ? "&" : "?"}tenant=${tenantSlug}`;
       }
     }

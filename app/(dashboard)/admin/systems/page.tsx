@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Server, Plus, Pencil, Trash2, Loader2, X, Check } from "lucide-react";
+import { Server, Plus, Pencil, Trash2, Loader2, Check } from "lucide-react";
 
 interface SystemItem {
   id: string;
