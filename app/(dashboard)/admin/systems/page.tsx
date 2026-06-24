@@ -12,6 +12,9 @@ interface SystemItem {
   color: string;
   ticketPrefix: string;
   isActive: boolean;
+  isDefault: boolean;
+  lineOaToken?: string | null;
+  lineOaSecret?: string | null;
   defaultAssignee: { id: string; displayName: string } | null;
   stats: { total: number; open: number; inProgress: number };
 }
@@ -20,18 +23,35 @@ const EMOJI_OPTIONS = ["🛍", "📢", "💰", "🤝", "🛒", "👥", "🧬", "
 
 export default function SystemsPage() {
   const [systems, setSystems] = useState<SystemItem[]>([]);
+  const [users, setUsers] = useState<{ id: string; displayName: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ code: "", name: "", description: "", color: "#3B82F6", icon: "⚙️", ticketPrefix: "" });
+  const [form, setForm] = useState({ code: "", name: "", description: "", color: "#3B82F6", icon: "⚙️", ticketPrefix: "", isDefault: false });
+  
+  const [editingSystem, setEditingSystem] = useState<SystemItem | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+    color: "#3B82F6",
+    icon: "⚙️",
+    defaultAssigneeId: "",
+    lineOaToken: "",
+    lineOaSecret: "",
+    isDefault: false,
+  });
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => { loadSystems(); }, []);
 
   async function loadSystems() {
-    const res = await fetch("/api/systems");
-    const data = await res.json();
-    setSystems(data.systems || []);
+    const [systemsRes, usersRes] = await Promise.all([
+      fetch("/api/systems").then((r) => r.json()),
+      fetch("/api/users").then((r) => r.json()).catch(() => []),
+    ]);
+    setSystems(systemsRes.systems || []);
+    setUsers(usersRes || []);
     setLoading(false);
   }
 
@@ -54,7 +74,56 @@ export default function SystemsPage() {
       return;
     }
     setShowForm(false);
-    setForm({ code: "", name: "", description: "", color: "#3B82F6", icon: "⚙️", ticketPrefix: "" });
+    setForm({ code: "", name: "", description: "", color: "#3B82F6", icon: "⚙️", ticketPrefix: "", isDefault: false });
+    setSaving(false);
+    loadSystems();
+  }
+
+  function handleEditClick(sys: SystemItem) {
+    setEditingSystem(sys);
+    setEditForm({
+      name: sys.name,
+      description: sys.description || "",
+      color: sys.color || "#3B82F6",
+      icon: sys.icon || "⚙️",
+      defaultAssigneeId: sys.defaultAssignee?.id || "",
+      lineOaToken: sys.lineOaToken || "",
+      lineOaSecret: sys.lineOaSecret || "",
+      isDefault: sys.isDefault || false,
+    });
+    setShowForm(false);
+    setError("");
+  }
+
+  async function handleUpdate() {
+    if (!editingSystem) return;
+    setError("");
+    if (!editForm.name) {
+      setError("กรุณากรอกชื่อระบบ");
+      return;
+    }
+    setSaving(true);
+    const res = await fetch(`/api/systems/${editingSystem.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: editForm.name,
+        description: editForm.description || null,
+        color: editForm.color,
+        icon: editForm.icon,
+        defaultAssigneeId: editForm.defaultAssigneeId || null,
+        lineOaToken: editForm.lineOaToken || null,
+        lineOaSecret: editForm.lineOaSecret || null,
+        isDefault: editForm.isDefault,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error);
+      setSaving(false);
+      return;
+    }
+    setEditingSystem(null);
     setSaving(false);
     loadSystems();
   }
@@ -66,6 +135,28 @@ export default function SystemsPage() {
       body: JSON.stringify({ isActive: !isActive }),
     });
     loadSystems();
+  }
+
+  async function handleDeleteClick(sys: SystemItem) {
+    if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบระบบ "${sys.name}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/systems/${sys.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "เกิดข้อผิดพลาดในการลบระบบ");
+        return;
+      }
+      if (data.message) {
+        alert(data.message);
+      }
+      loadSystems();
+    } catch (err) {
+      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+    }
   }
 
   if (loading) {
@@ -87,7 +178,10 @@ export default function SystemsPage() {
           <p className="text-sm text-gray-500 mt-1">เพิ่ม/แก้ไขระบบที่ PM ดูแล</p>
         </div>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={() => {
+            setShowForm(true);
+            setEditingSystem(null);
+          }}
           className="btn-primary flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
@@ -168,6 +262,18 @@ export default function SystemsPage() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
             </div>
+            <div className="flex items-center gap-2 mt-2 sm:col-span-2">
+              <input
+                type="checkbox"
+                id="create-isDefault"
+                className="w-4 h-4 text-nano-600 border-gray-300 rounded focus:ring-nano-500 cursor-pointer"
+                checked={form.isDefault}
+                onChange={(e) => setForm({ ...form, isDefault: e.target.checked })}
+              />
+              <label htmlFor="create-isDefault" className="text-sm font-medium text-gray-700 cursor-pointer">
+                ตั้งเป็นระบบเริ่มต้นหลัก (Default System)
+              </label>
+            </div>
           </div>
 
           {/* Preview */}
@@ -198,6 +304,126 @@ export default function SystemsPage() {
         </div>
       )}
 
+      {/* Edit Form */}
+      {editingSystem && (
+        <div className="card border-nano-200 bg-nano-50/30">
+          <h3 className="font-semibold text-gray-900 mb-4">แก้ไขระบบ: {editingSystem.name}</h3>
+          {error && <div className="text-sm text-red-600 bg-red-50 rounded-lg p-3 mb-4">{error}</div>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">ชื่อระบบ</label>
+              <input
+                className="input-field mt-1"
+                placeholder="เช่น HRIS, CRM"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Dev หลัก (Default Assignee)</label>
+              <select
+                className="input-field mt-1"
+                value={editForm.defaultAssigneeId}
+                onChange={(e) => setEditForm({ ...editForm, defaultAssigneeId: e.target.value })}
+              >
+                <option value="">-- เลือก Dev หลัก --</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">สี</label>
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="color"
+                  className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer"
+                  value={editForm.color}
+                  onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
+                />
+                <span className="text-sm text-gray-500">{editForm.color}</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Icon</label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {EMOJI_OPTIONS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, icon: e })}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg transition-all ${
+                      editForm.icon === e
+                        ? "bg-nano-100 ring-2 ring-nano-300"
+                        : "bg-gray-50 hover:bg-gray-100"
+                    }`}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-sm font-medium text-gray-700">คำอธิบาย</label>
+              <input
+                className="input-field mt-1"
+                placeholder="คำอธิบายสั้นๆ"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">LINE OA Access Token</label>
+              <input
+                type="password"
+                className="input-field mt-1"
+                placeholder="LINE Channel Access Token"
+                value={editForm.lineOaToken}
+                onChange={(e) => setEditForm({ ...editForm, lineOaToken: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">LINE OA Channel Secret</label>
+              <input
+                type="password"
+                className="input-field mt-1"
+                placeholder="LINE Channel Secret"
+                value={editForm.lineOaSecret}
+                onChange={(e) => setEditForm({ ...editForm, lineOaSecret: e.target.value })}
+              />
+            </div>
+            <div className="flex items-center gap-2 mt-2 sm:col-span-2">
+              <input
+                type="checkbox"
+                id="edit-isDefault"
+                className="w-4 h-4 text-nano-600 border-gray-300 rounded focus:ring-nano-500 cursor-pointer"
+                checked={editForm.isDefault}
+                onChange={(e) => setEditForm({ ...editForm, isDefault: e.target.checked })}
+              />
+              <label htmlFor="edit-isDefault" className="text-sm font-medium text-gray-700 cursor-pointer">
+                ตั้งเป็นระบบเริ่มต้นหลัก (Default System)
+              </label>
+            </div>
+          </div>
+
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={handleUpdate}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              บันทึกการแก้ไข
+            </button>
+            <button onClick={() => setEditingSystem(null)} className="btn-secondary">
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* System List */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {systems.map((sys) => (
@@ -217,20 +443,43 @@ export default function SystemsPage() {
                   {sys.icon || "⚙️"}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">{sys.name}</h3>
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    {sys.name}
+                    {sys.isDefault && (
+                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium shrink-0">
+                        เริ่มต้น
+                      </span>
+                    )}
+                  </h3>
                   <p className="text-xs text-gray-400 font-mono">{sys.code} • {sys.ticketPrefix}</p>
                 </div>
               </div>
-              <button
-                onClick={() => handleToggle(sys.id, sys.isActive)}
-                className={`text-xs px-2 py-1 rounded-full ${
-                  sys.isActive
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-gray-100 text-gray-500"
-                }`}
-              >
-                {sys.isActive ? "เปิด" : "ปิด"}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleEditClick(sys)}
+                  className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-nano-600 transition-colors"
+                  title="แก้ไข"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleDeleteClick(sys)}
+                  className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-red-600 transition-colors"
+                  title="ลบระบบ"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleToggle(sys.id, sys.isActive)}
+                  className={`text-xs px-2 py-1 rounded-full ${
+                    sys.isActive
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {sys.isActive ? "เปิด" : "ปิด"}
+                </button>
+              </div>
             </div>
 
             {sys.description && (

@@ -142,13 +142,19 @@ export function groupMenuFlex(plan: Plan, systemName?: string, bot?: BotMeta) {
 //  SYSTEM SELECT
 // ══════════════════════════════════════════════════════════════
 
-export function systemSelectFlex(systems: SystemInfo[], actionPrefix: string, bot?: BotMeta) {
+export function systemSelectFlex(systems: SystemInfo[], actionPrefix: string, bot?: BotMeta, textSuffix?: string) {
   const { botName, botPersona, themeColor } = meta(bot);
-  const buttons = systems.slice(0, 10).map((sys) => ({
-    type: "button",
-    action: { type: "message", label: `${sys.icon || "⚙️"} ${sys.name}`, text: `${actionPrefix} [${sys.code}]` },
-    style: "secondary", height: "sm",
-  }));
+  const buttons = systems.slice(0, 10).map((sys) => {
+    let buttonText = `${actionPrefix} [${sys.code}]`;
+    if (textSuffix) {
+      buttonText += ` ${textSuffix}`;
+    }
+    return {
+      type: "button",
+      action: { type: "message", label: `${sys.icon || "⚙️"} ${sys.name}`, text: buttonText },
+      style: "secondary", height: "sm",
+    };
+  });
   return {
     type: "flex", altText: `เลือกระบบ${botPersona}`,
     contents: {

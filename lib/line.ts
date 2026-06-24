@@ -166,3 +166,30 @@ export async function testLineConnection(
     };
   }
 }
+
+interface LineGroupSummary {
+  groupId: string;
+  groupName: string;
+  pictureUrl?: string;
+}
+
+/**
+ * ดึงชื่อและข้อมูลสรุปของ LINE Group
+ */
+export async function getLineGroupSummary(
+  encryptedToken: string,
+  groupId: string
+): Promise<LineGroupSummary> {
+  const token = decrypt(encryptedToken);
+  const res = await fetch(`https://api.line.me/v2/bot/group/${groupId}/summary`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`ไม่สามารถดึงข้อมูล LINE Group Summary ได้: ${res.statusText}`);
+  }
+
+  return res.json();
+}

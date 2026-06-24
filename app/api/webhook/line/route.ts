@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { validateLineSignature, replyMessage } from "@/lib/line";
+import { validateLineSignature, replyMessage, getLineGroupSummary } from "@/lib/line";
 import { parseNanoCommand } from "@/lib/nano-router";
 import { queryDatabase } from "@/lib/gemini";
 import {
@@ -183,12 +183,49 @@ export async function POST(request: NextRequest) {
 
       // วิเคราะห์คำสั่ง
       const action = parseNanoCommand(messageText, sourceType, tenant.plan);
-      if (!action) continue;
 
       // ดึง user
       const user = await prisma.user.findFirst({
         where: { tenantId: tenant.id, lineUid },
       });
+
+      // ─── ตรวจสอบและสร้าง GroupConfig อัตโนมัติ ────────────────
+      if (lineGroupId) {
+        try {
+          const existingGroup = await prisma.groupConfig.findUnique({
+            where: {
+              tenantId_lineGroupId: {
+                tenantId: tenant.id,
+                lineGroupId: lineGroupId,
+              },
+            },
+          });
+
+          if (!existingGroup) {
+            let groupName = `กลุ่มไลน์ (${lineGroupId.substring(0, 6)})`;
+            try {
+              const summary = await getLineGroupSummary(tenant.lineOaToken!, lineGroupId);
+              if (summary && summary.groupName) {
+                groupName = summary.groupName;
+              }
+            } catch (err) {
+              console.error("Failed to fetch line group summary:", err);
+            }
+
+            await prisma.groupConfig.create({
+              data: {
+                tenantId: tenant.id,
+                lineGroupId: lineGroupId,
+                name: groupName,
+                isActive: true,
+                autoJoined: true,
+              },
+            });
+          }
+        } catch (err) {
+          console.error("Failed to auto-create group config:", err);
+        }
+      }
 
       // ─── บันทึก ChatLog (INCOMING) ──────────────────────────
       await prisma.chatLog.create({
@@ -199,15 +236,20 @@ export async function POST(request: NextRequest) {
           lineGroupId,
           messageText,
           direction: "INCOMING",
-          replyAction: action.action,
+          replyAction: action?.action || null,
         },
-      }).catch(() => {}); // ไม่ให้ error ทำให้ webhook ล้ม
+      }).catch((err) => {
+        console.error("Failed to save INCOMING chat log:", err);
+      });
+
+      // หากไม่ใช่คำสั่งบอท ให้ข้ามขั้นตอนการทำคำสั่งไปเงียบๆ
+      if (!action) continue;
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nano.technomand-ai.cloud';
 
       // Helper: wrapper to reply using context variables
       const reply = async (messages: any[], oaToken = tenant.lineOaToken!) => {
-        await replyAndLog(oaToken, event.replyToken, messages, lineUid, lineGroupId, action.action);
+        await replyAndLog(oaToken, event.replyToken, messages, lineUid, lineGroupId, action?.action || "REPLY");
       };
 
       // ─── Resolve System ───────────────────────────────────
@@ -240,6 +282,14 @@ export async function POST(request: NextRequest) {
               return activeSystems[0];
             }
           }
+        }
+
+        // ค้นหาระบบเริ่มต้นหลักของ Tenant (ถ้ามีกำหนดไว้)
+        const defaultSystem = await prisma.system.findFirst({
+          where: { tenantId: tenant!.id, isDefault: true, isActive: true },
+        });
+        if (defaultSystem) {
+          return defaultSystem;
         }
 
         return null;
@@ -278,10 +328,11 @@ export async function POST(request: NextRequest) {
               { type: "text", text: "ยังไม่มีระบบที่ตั้งค่าไว้ค่ะ กรุณาติดต่อผู้ดูแลระบบ" } as never,
             ]);
           } else {
+            const prefix = sourceType !== "user" ? "nano แจ้ง" : "แจ้ง";
             await reply([
               systemSelectFlex(
                 systems.map((s) => ({ id: s.id, code: s.code, name: s.name, icon: s.icon, color: s.color })),
-                "แจ้ง",
+                prefix,
                 botMeta
               ) as never,
             ]);
@@ -344,11 +395,13 @@ export async function POST(request: NextRequest) {
                 { type: "text", text: "ยังไม่มีระบบในองค์กร กรุณาติดต่อ Admin ค่ะ" } as never,
               ]);
             } else {
+              const prefix = sourceType !== "user" ? "nano แจ้ง" : "แจ้ง";
               await reply([
                 systemSelectFlex(
                   systems.map((s) => ({ id: s.id, code: s.code, name: s.name, icon: s.icon, color: s.color })),
-                  "แจ้ง",
-                  botMeta
+                  prefix,
+                  botMeta,
+                  action.text
                 ) as never,
               ]);
             }
@@ -426,11 +479,15 @@ export async function POST(request: NextRequest) {
                 { type: "text", text: "ยังไม่มีระบบในองค์กร กรุณาติดต่อ Admin ค่ะ" } as never,
               ]);
             } else {
+              const prefix = sourceType !== "user"
+                ? `nano note @${action.assigneeName}`
+                : `note @${action.assigneeName}`;
               await reply([
                 systemSelectFlex(
                   systems.map((s) => ({ id: s.id, code: s.code, name: s.name, icon: s.icon, color: s.color })),
-                  "โน้ต",
-                  botMeta
+                  prefix,
+                  botMeta,
+                  action.text
                 ) as never,
               ]);
             }
@@ -788,6 +845,8 @@ export async function POST(request: NextRequest) {
             botPersona: botMeta.botPersona,
             systemPrompt: botConfigRow?.systemPrompt,
             aiModel: botConfigRow?.aiModel,
+            lineUid: lineUid,
+            lineGroupId: lineGroupId,
           });
 
           await reply([{ type: "text", text: answer } as never]);

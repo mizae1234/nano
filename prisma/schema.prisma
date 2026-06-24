@@ -165,6 +165,8 @@ model System {
   lineOaToken       String?                   // encrypted
   lineOaSecret      String?                   // encrypted
 
+  isDefault         Boolean  @default(false)  // เป็นระบบเริ่มต้นหลักขององค์กรหรือไม่
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

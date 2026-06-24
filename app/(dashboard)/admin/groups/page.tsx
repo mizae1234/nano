@@ -101,13 +101,6 @@ export default function GroupsPage() {
             Config LINE Group ↔ ระบบ — Group ที่ผูก 1 ระบบ บอทจะรู้เองอัตโนมัติ
           </p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          เพิ่ม Group
-        </button>
       </div>
 
       {/* Create Form */}
@@ -248,7 +241,7 @@ export default function GroupsPage() {
       {groups.length === 0 && !showForm && (
         <div className="text-center py-12 text-gray-400">
           <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">ยังไม่มี LINE Group — กดปุ่ม &quot;เพิ่ม Group&quot; เพื่อเริ่มต้น</p>
+          <p className="text-sm">ยังไม่มี LINE Group</p>
         </div>
       )}
     </div>

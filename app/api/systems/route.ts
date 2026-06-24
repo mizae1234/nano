@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { code, name, description, color, icon, ticketPrefix, defaultAssigneeId } = body;
+    const { code, name, description, color, icon, ticketPrefix, defaultAssigneeId, isDefault } = body;
 
     if (!code || !name || !ticketPrefix) {
       return NextResponse.json(
@@ -104,6 +104,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ถ้าตั้งเป็น default -> ปลดเครื่องหมาย default ของระบบอื่นใน tenant เดียวกัน
+    if (isDefault) {
+      await prisma.system.updateMany({
+        where: { tenantId: session.tenantId },
+        data: { isDefault: false },
+      });
+    }
+
     const system = await prisma.system.create({
       data: {
         tenantId: session.tenantId,
@@ -114,6 +122,7 @@ export async function POST(request: NextRequest) {
         icon: icon || null,
         ticketPrefix: ticketPrefix.toUpperCase(),
         defaultAssigneeId: defaultAssigneeId || null,
+        isDefault: !!isDefault,
       },
     });
 

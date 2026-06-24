@@ -29,6 +29,8 @@ export interface BotQueryContext {
   botPersona?: string;
   systemPrompt?: string | null;
   aiModel?: string;
+  lineUid?: string;
+  lineGroupId?: string | null;
 }
 
 // ─── Auto-categorize: วิเคราะห์ข้อความ → priority + category ─
@@ -174,17 +176,55 @@ export async function queryDatabase(
   // ─── สร้าง System Prompt ──────────────────────────────────
   const systemPromptText = buildSystemPrompt(context, snapshot);
 
+  // ─── ดึงประวัติการสนทนาย้อนหลัง 10 ข้อความ (จำได้ 5-10 ประโยค) ───
+  let chatHistoryText = "";
+  if (context.lineUid || context.lineGroupId) {
+    try {
+      const history = await prismaReadonly.chatLog.findMany({
+        where: {
+          tenantId: context.tenantId,
+          ...(context.lineGroupId
+            ? { lineGroupId: context.lineGroupId } // แชทกลุ่ม: ดึงข้อความทั้งหมดในกลุ่มนี้
+            : { lineUid: context.lineUid, lineGroupId: null } // แชทส่วนตัว: ดึงประวัติของ User คนนั้นแบบ DM
+          ),
+        },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          displayName: true,
+          messageText: true,
+          direction: true,
+        },
+      });
+
+      // เรียงจากเก่าไปใหม่
+      const sortedHistory = [...history].reverse();
+      chatHistoryText = sortedHistory
+        .map((log) => {
+          const senderName = log.direction === "INCOMING"
+            ? (log.displayName || "ผู้ใช้")
+            : (context.botName || "น้องนาโน");
+          return `${senderName}: ${log.messageText}`;
+        })
+        .join("\n");
+    } catch (err) {
+      console.error("Failed to fetch chat logs for Gemini context:", err);
+    }
+  }
+
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
     model: context.aiModel || "gemini-3-flash-preview",
   });
 
   try {
-    const result = await model.generateContent([
-      { text: systemPromptText },
-      { text: `คำถาม: ${sanitizedQuestion}` },
-    ]);
+    const promptParts: any[] = [{ text: systemPromptText }];
+    if (chatHistoryText) {
+      promptParts.push({ text: `ประวัติบทสนทนาล่าสุดของห้องแชทนี้:\n${chatHistoryText}` });
+    }
+    promptParts.push({ text: `คำถามปัจจุบัน: ${sanitizedQuestion}` });
 
+    const result = await model.generateContent(promptParts);
     return result.response.text();
   } catch (error) {
     console.error("Gemini query error:", error);
