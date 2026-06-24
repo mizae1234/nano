@@ -1,0 +1,256 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { MessageSquare, Plus, Loader2, Check, X, Trash2 } from "lucide-react";
+
+interface SystemInfo {
+  id: string;
+  code: string;
+  name: string;
+  icon: string | null;
+  color: string;
+}
+
+interface GroupItem {
+  id: string;
+  lineGroupId: string;
+  name: string;
+  isActive: boolean;
+  groupSystems: {
+    system: SystemInfo;
+  }[];
+}
+
+export default function GroupsPage() {
+  const [groups, setGroups] = useState<GroupItem[]>([]);
+  const [systems, setSystems] = useState<SystemInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ lineGroupId: "", name: "", systemIds: [] as string[] });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => { loadData(); }, []);
+
+  async function loadData() {
+    const [groupRes, sysRes] = await Promise.all([
+      fetch("/api/groups").then((r) => r.json()),
+      fetch("/api/systems").then((r) => r.json()),
+    ]);
+    setGroups(groupRes.groups || []);
+    setSystems(sysRes.systems?.filter((s: SystemInfo & { isActive: boolean }) => s.isActive) || []);
+    setLoading(false);
+  }
+
+  async function handleCreate() {
+    setError("");
+    if (!form.lineGroupId || !form.name) {
+      setError("กรุณากรอก LINE Group ID และ ชื่อ");
+      return;
+    }
+    setSaving(true);
+    const res = await fetch("/api/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error);
+      setSaving(false);
+      return;
+    }
+    setShowForm(false);
+    setForm({ lineGroupId: "", name: "", systemIds: [] });
+    setSaving(false);
+    loadData();
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("ต้องการลบ Group นี้ใช่ไหม?")) return;
+    await fetch(`/api/groups/${id}`, { method: "DELETE" });
+    loadData();
+  }
+
+  function toggleSystem(sysId: string) {
+    setForm((prev) => ({
+      ...prev,
+      systemIds: prev.systemIds.includes(sysId)
+        ? prev.systemIds.filter((id) => id !== sysId)
+        : [...prev.systemIds, sysId],
+    }));
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 text-nano-500 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-nano-500" />
+            จัดการ LINE Group
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Config LINE Group ↔ ระบบ — Group ที่ผูก 1 ระบบ บอทจะรู้เองอัตโนมัติ
+          </p>
+        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="btn-primary flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          เพิ่ม Group
+        </button>
+      </div>
+
+      {/* Create Form */}
+      {showForm && (
+        <div className="card border-nano-200 bg-nano-50/30">
+          <h3 className="font-semibold text-gray-900 mb-4">เพิ่ม LINE Group</h3>
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 rounded-lg p-3 mb-4">{error}</div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">ชื่อ Group</label>
+              <input
+                className="input-field mt-1"
+                placeholder="เช่น Support Saran Jeans"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">LINE Group ID</label>
+              <input
+                className="input-field mt-1"
+                placeholder="C1234..."
+                value={form.lineGroupId}
+                onChange={(e) => setForm({ ...form, lineGroupId: e.target.value })}
+              />
+              <p className="text-[10px] text-gray-400 mt-1">
+                น้องนาโนจะแจ้ง Group ID เมื่อถูกเพิ่มเข้ากลุ่ม
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="text-sm font-medium text-gray-700">ผูกกับระบบ</label>
+            <p className="text-[10px] text-gray-400 mb-2">
+              ผูก 1 ระบบ = บอทรู้เองอัตโนมัติ | ผูกหลายระบบ = บอทจะถาม
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {systems.map((sys) => (
+                <button
+                  key={sys.id}
+                  type="button"
+                  onClick={() => toggleSystem(sys.id)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-all ${
+                    form.systemIds.includes(sys.id)
+                      ? "border-transparent text-white"
+                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                  style={
+                    form.systemIds.includes(sys.id)
+                      ? { backgroundColor: sys.color }
+                      : undefined
+                  }
+                >
+                  {sys.icon || "⚙️"} {sys.name}
+                  {form.systemIds.includes(sys.id) && <Check className="w-3.5 h-3.5" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={handleCreate}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              สร้าง Group
+            </button>
+            <button onClick={() => setShowForm(false)} className="btn-secondary">
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Group List */}
+      <div className="space-y-3">
+        {groups.map((group) => (
+          <div
+            key={group.id}
+            className={`card flex items-center gap-4 ${!group.isActive ? "opacity-50" : ""}`}
+          >
+            <div className="w-10 h-10 rounded-xl bg-nano-50 flex items-center justify-center shrink-0">
+              <MessageSquare className="w-5 h-5 text-nano-500" />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-gray-900">{group.name}</div>
+              <div className="text-xs text-gray-400 font-mono truncate">
+                {group.lineGroupId}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {group.groupSystems.length === 0 ? (
+                <span className="text-xs text-gray-400">ยังไม่ได้ผูกระบบ</span>
+              ) : (
+                group.groupSystems.map((gs) => (
+                  <span
+                    key={gs.system.id}
+                    className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: `${gs.system.color}15`,
+                      color: gs.system.color,
+                    }}
+                  >
+                    {gs.system.icon || "⚙️"} {gs.system.name}
+                  </span>
+                ))
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              {group.groupSystems.length === 1 && (
+                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                  auto
+                </span>
+              )}
+              {group.groupSystems.length > 1 && (
+                <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                  ถาม
+                </span>
+              )}
+              <button
+                onClick={() => handleDelete(group.id)}
+                className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {groups.length === 0 && !showForm && (
+        <div className="text-center py-12 text-gray-400">
+          <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">ยังไม่มี LINE Group — กดปุ่ม &quot;เพิ่ม Group&quot; เพื่อเริ่มต้น</p>
+        </div>
+      )}
+    </div>
+  );
+}

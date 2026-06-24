@@ -1,0 +1,272 @@
+// ─── น้องนาโน — Prisma Schema ──────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── PLATFORM LEVEL ──────────────────────────────────────────
+
+model PlatformAdmin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // bcrypt hashed
+  createdAt DateTime @default(now())
+}
+
+model Tenant {
+  id             String    @id @default(cuid())
+  slug           String    @unique           // subdomain: "icare", "hotel"
+  name           String                      // ชื่อองค์กร
+  logoUrl        String?
+  themeColor     String    @default("#0066FF")
+
+  // Plan & Trial
+  plan           Plan      @default(TRIAL)
+  trialEndsAt    DateTime?                   // set to now()+14d on register
+  isActive       Boolean   @default(true)
+
+  // DB mode
+  dbMode         DbMode    @default(SHARED)
+  dedicatedDbUrl String?                     // encrypted — Enterprise only
+
+  // LINE OA หลัก (per tenant — fallback สำหรับ system ที่ไม่มี OA)
+  lineOaToken    String?                     // encrypted
+  lineOaSecret   String?                     // encrypted
+  lineOaGroupId  String?                     // LINE group ID to notify IT/Admin
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  users          User[]
+  departments    Department[]
+  tickets        Ticket[]
+  categories     Category[]
+  auditLogs      AuditLog[]
+  systems        System[]
+  groupConfigs   GroupConfig[]
+}
+
+enum Plan {
+  TRIAL       // 14 วัน, max 10 users, max 100 tickets, ไม่มี AI
+  STARTER     // 990/เดือน, max 20 users, max 500 tickets/เดือน, ไม่มี AI
+  PRO         // 2,990/เดือน, ไม่จำกัด users/tickets, มี Nano AI bot
+  ENTERPRISE  // Custom, Dedicated DB, White-label, SLA
+}
+
+enum DbMode {
+  SHARED      // ใช้ DATABASE_URL ร่วมกัน
+  DEDICATED   // มี dedicatedDbUrl แยก (Enterprise)
+}
+
+// ─── TENANT LEVEL ────────────────────────────────────────────
+
+model Department {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String                          // "IT", "HR", "Finance", "Operations"
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  users       User[]
+  tickets     Ticket[]
+  categories  Category[]
+
+  @@unique([tenantId, name])
+}
+
+model User {
+  id           String      @id @default(cuid())
+  tenantId     String
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  departmentId String?                        // null = ยังไม่ได้สังกัด dept
+  department   Department? @relation(fields: [departmentId], references: [id])
+  lineUid      String
+  displayName  String
+  pictureUrl   String?
+  role         Role        @default(USER)
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  createdTickets    Ticket[]        @relation("CreatedBy")
+  assignedTickets   Ticket[]        @relation("AssignedTo")
+  comments          TicketComment[]
+  auditLogs         AuditLog[]
+  defaultForSystems System[]        @relation("DefaultAssignee")
+
+  @@unique([tenantId, lineUid])
+}
+
+enum Role {
+  USER        // แจ้งปัญหา, ดู ticket ตัวเอง
+  IT          // รับ/แก้ไข ticket ที่ได้รับมอบหมายใน department ตัวเอง
+  DEPT_ADMIN  // จัดการทุก ticket + สมาชิกใน department ตัวเอง
+  ADMIN       // จัดการทุก department ใน org
+  SUPER_ADMIN // ตั้งค่าระบบ, เชื่อม LINE OA, จัดการ role ทุกระดับ
+}
+
+// ─── SYSTEM (ระบบที่ PM ดูแล) ────────────────────────────────
+
+model System {
+  id                String   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  code              String                    // short code เช่น "saran", "fertilizer"
+  name              String                    // ชื่อเต็ม เช่น "Saran Jeans"
+  description       String?
+  color             String   @default("#0066FF")  // สีประจำระบบ
+  icon              String?                   // emoji icon เช่น "🛍"
+  ticketPrefix      String                    // prefix สำหรับ ticket number เช่น "SAR", "FER"
+  isActive          Boolean  @default(true)
+
+  // Dev หลักที่รับผิดชอบ
+  defaultAssigneeId String?
+  defaultAssignee   User?    @relation("DefaultAssignee", fields: [defaultAssigneeId], references: [id])
+
+  // LINE OA เสริม (optional — ถ้าไม่มีจะ fallback ไปใช้ Tenant)
+  lineOaToken       String?                   // encrypted
+  lineOaSecret      String?                   // encrypted
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tickets           Ticket[]
+  groupSystems      GroupSystem[]
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, ticketPrefix])
+}
+
+// ─── GROUP CONFIG (LINE Group ↔ System mapping) ──────────────
+
+model GroupConfig {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  lineGroupId   String                      // LINE Group ID
+  name          String                      // ชื่อที่ PM ตั้ง เช่น "กลุ่ม Support Saran"
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  groupSystems  GroupSystem[]
+
+  @@unique([tenantId, lineGroupId])
+}
+
+model GroupSystem {
+  id            String      @id @default(cuid())
+  groupConfigId String
+  groupConfig   GroupConfig  @relation(fields: [groupConfigId], references: [id], onDelete: Cascade)
+  systemId      String
+  system        System      @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  @@unique([groupConfigId, systemId])
+}
+
+// ─── TICKET ──────────────────────────────────────────────────
+
+enum TicketType {
+  BUG          // ปัญหาระบบ
+  FEATURE      // ขอฟีเจอร์ใหม่
+  TASK         // งานทั่วไป
+  QUESTION     // คำถาม/สอบถาม
+}
+
+model Ticket {
+  id           String       @id @default(cuid())
+  tenantId     String
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  departmentId String?                        // ticket เข้า dept ไหน
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  systemId     String?                        // ticket ของระบบไหน
+  system       System?      @relation(fields: [systemId], references: [id])
+  ticketNo     Int                            // auto-increment per system (e.g. SAR-1, SAR-2)
+  ticketType   TicketType   @default(BUG)     // ประเภทงาน
+  title        String
+  description  String
+  status       TicketStatus @default(OPEN)
+  priority     Priority     @default(MEDIUM)
+  categoryId   String?
+  category     Category?    @relation(fields: [categoryId], references: [id])
+  createdById  String
+  createdBy    User         @relation("CreatedBy", fields: [createdById], references: [id])
+  assignedToId String?
+  assignedTo   User?        @relation("AssignedTo", fields: [assignedToId], references: [id])
+  resolvedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  comments     TicketComment[]
+  auditLogs    AuditLog[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, departmentId])
+  @@index([tenantId, createdById])
+  @@index([tenantId, systemId])
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model Category {
+  id           String      @id @default(cuid())
+  tenantId     String
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  departmentId String?                        // null = ใช้ได้ทุก dept
+  department   Department? @relation(fields: [departmentId], references: [id])
+  name         String
+  tickets      Ticket[]
+
+  @@unique([tenantId, departmentId, name])
+}
+
+model TicketComment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+}
+
+model MigrationLog {
+  id          String    @id @default(cuid())
+  tenantId    String    @unique
+  status      String    // "pending", "in_progress", "completed", "failed"
+  startedAt   DateTime?
+  completedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+}

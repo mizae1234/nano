@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,23 +7,171 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --nano-primary: #0066FF;
+  --nano-primary-dark: #0052cc;
+  --nano-primary-light: #eff6ff;
+  --nano-gradient-start: #0066FF;
+  --nano-gradient-end: #7c3aed;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --sidebar-width: 260px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Sarabun", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Glassmorphism Utilities ─────────────────────────── */
+@layer components {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-card {
+    @apply glass rounded-2xl shadow-glass;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300;
+  }
+
+  .glass-card-hover:hover {
+    @apply shadow-glass-lg;
+    transform: translateY(-2px);
+  }
+
+  /* ─── Gradient Backgrounds ───────────────────────────── */
+  .bg-gradient-nano {
+    background: linear-gradient(135deg, var(--nano-gradient-start), var(--nano-gradient-end));
+  }
+
+  .bg-gradient-nano-animated {
+    background: linear-gradient(135deg, #0066FF, #7c3aed, #06b6d4, #0066FF);
+    background-size: 300% 300%;
+    animation: gradient 8s ease infinite;
+  }
+
+  .bg-gradient-mesh {
+    background:
+      radial-gradient(at 40% 20%, hsla(220, 100%, 50%, 0.15) 0px, transparent 50%),
+      radial-gradient(at 80% 0%, hsla(270, 100%, 50%, 0.12) 0px, transparent 50%),
+      radial-gradient(at 0% 50%, hsla(190, 100%, 50%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 80% 50%, hsla(340, 100%, 50%, 0.08) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(220, 100%, 50%, 0.1) 0px, transparent 50%);
+  }
+
+  /* ─── Button Styles ──────────────────────────────────── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-2.5 rounded-xl font-medium text-white
+           bg-nano-500 hover:bg-nano-600 active:bg-nano-700
+           transition-all duration-200 shadow-nano hover:shadow-nano-lg
+           focus:outline-none focus:ring-2 focus:ring-nano-500 focus:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-2.5 rounded-xl font-medium
+           text-nano-500 bg-nano-50 hover:bg-nano-100 active:bg-nano-200
+           transition-all duration-200 border border-nano-200
+           focus:outline-none focus:ring-2 focus:ring-nano-500 focus:ring-offset-2;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center px-6 py-2.5 rounded-xl font-medium
+           text-gray-600 hover:text-gray-900 hover:bg-gray-100 active:bg-gray-200
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center px-6 py-2.5 rounded-xl font-medium text-white
+           bg-red-500 hover:bg-red-600 active:bg-red-700
+           transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+  }
+
+  /* ─── Input Styles ───────────────────────────────────── */
+  .input-field {
+    @apply w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white
+           text-gray-900 placeholder:text-gray-400
+           focus:outline-none focus:ring-2 focus:ring-nano-500 focus:border-transparent
+           transition-all duration-200;
+  }
+
+  .input-label {
+    @apply block text-sm font-medium text-gray-700 mb-1.5;
+  }
+
+  /* ─── Badge Styles ───────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  /* ─── Sidebar ────────────────────────────────────────── */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-gray-600
+           hover:bg-nano-50 hover:text-nano-600 transition-all duration-200
+           font-medium text-sm;
+  }
+
+  .sidebar-link-active {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl
+           bg-nano-50 text-nano-600 font-semibold text-sm
+           border-l-4 border-nano-500;
+  }
+
+  /* ─── Card Styles ────────────────────────────────────── */
+  .card {
+    @apply bg-white rounded-2xl border border-gray-100 shadow-sm p-6;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5;
+  }
+
+  /* ─── Shimmer Loading ────────────────────────────────── */
+  .shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 3px;
   }
 }
