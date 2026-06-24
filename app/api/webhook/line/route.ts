@@ -139,6 +139,36 @@ export async function POST(request: NextRequest) {
       };
 
       switch (action.action) {
+        case "GREETING": {
+          const name = botMeta.botName || "น้องนาโน";
+          const persona = botMeta.botPersona || "ค่ะ";
+          await replyMessage(tenant.lineOaToken, event.replyToken, [
+            {
+              type: "text",
+              text: `สวัสดีครับ/ค่ะ 👋 ยินดีให้บริการ${persona}\n\n${name}พร้อมช่วยท่านแจ้งปัญหา ดูสถานะ ticket หรือถามข้อมูลต่างๆ\n\nพิมพ์ "เมนู" เพื่อดูคำสั่งทั้งหมด${persona}`,
+            } as never,
+          ]);
+          break;
+        }
+
+        case "SHOW_SYSTEMS": {
+          const systems = await getTenantSystems();
+          if (systems.length === 0) {
+            await replyMessage(tenant.lineOaToken, event.replyToken, [
+              { type: "text", text: "ยังไม่มีระบบที่ตั้งค่าไว้ค่ะ กรุณาติดต่อผู้ดูแลระบบ" } as never,
+            ]);
+          } else {
+            await replyMessage(tenant.lineOaToken, event.replyToken, [
+              systemSelectFlex(
+                systems.map((s) => ({ id: s.id, code: s.code, name: s.name, icon: s.icon, color: s.color })),
+                "แจ้ง",
+                botMeta
+              ) as never,
+            ]);
+          }
+          break;
+        }
+
         case "SHOW_MENU":
           await replyMessage(tenant.lineOaToken, event.replyToken, [
             menuFlex(tenant.plan, botMeta, menuMsg) as never,
