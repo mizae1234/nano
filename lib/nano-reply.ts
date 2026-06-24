@@ -103,6 +103,7 @@ export function menuFlex(plan: Plan, bot?: BotMeta, menuMessage?: string) {
           { type: "text", text: menuMessage || `เลือกสิ่งที่ต้องการ${botPersona} 😊`, size: "sm", color: "#333333", weight: "bold" },
           { type: "separator", margin: "sm" },
           { type: "text", text: "💬 แชทส่วนตัว (พิมพ์สั่งได้ทันที):", size: "xs", color: "#555555", weight: "bold", margin: "sm" },
+          { type: "text", text: "• ลงทะเบียน: ลงทะเบียน รหัสพนักงาน [รหัส] ชื่อ [ชื่อ] แผนก [แผนก]\n   เช่น: ลงทะเบียน รหัสพนักงาน 68 ชื่อ กนิษฐา แผนก IT", size: "xxs", color: "#666666", wrap: true },
           { type: "text", text: "• สร้างตั๋ว: แจ้ง [ระบบ] [รายละเอียด]\n   เช่น: แจ้ง it คอมเปิดไม่ติด", size: "xxs", color: "#666666", wrap: true },
           { type: "text", text: "• ดูตั๋วของคุณ: พิมพ์ \"ดูตั๋ว\"", size: "xxs", color: "#666666" },
           { type: "text", text: "• เช็คสถานะ: พิมพ์ \"สถานะ #1\"", size: "xxs", color: "#666666" },
@@ -696,6 +697,14 @@ export function getQuickReply(sourceType: "user" | "group" | "room") {
           type: "message",
           label: "📋 เมนูคำสั่ง",
           text: `${prefix}เมนู`
+        }
+      },
+      {
+        type: "action",
+        action: {
+          type: "message",
+          label: "👤 ลงทะเบียน",
+          text: `${prefix}ลงทะเบียน`
         }
       },
       {
