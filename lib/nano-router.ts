@@ -138,11 +138,6 @@ export function parseNanoCommand(
   // ─── 6. เมนู / Help ───────────────────────────────────────
   if (includes(text, MENU_WORDS)) return { action: "SHOW_MENU" };
 
-  // ─── 7. PRO/ENTERPRISE: ส่งให้ Gemini AI ─────────────────
-  if (plan !== "TRIAL" && plan !== "STARTER") {
-    return { action: "GEMINI_QUERY", query: text };
-  }
-
-  // ─── 8. TRIAL: แสดงเมนู ───────────────────────────────────
-  return { action: "SHOW_MENU" };
+  // ─── ทุก plan: ส่งให้ Gemini AI จัดการ ──────────────────────
+  return { action: "GEMINI_QUERY", query: text };
 }
