@@ -18,6 +18,7 @@ export type NanoAction =
   | { action: "GROUP_SUMMARY"; systemCode?: string }
   | { action: "GEMINI_QUERY"; query: string }
   | { action: "UPGRADE_REQUIRED" }
+  | { action: "REGISTER"; employeeCode: string; name: string; departmentName: string }
   | null;
 
 // ─── Keyword Banks ────────────────────────────────────────────
@@ -92,6 +93,19 @@ export function parseNanoCommand(
   }
 
   if (!text) return { action: "SHOW_MENU" };
+
+  // ─── 0.1. ลงทะเบียน ───────────────────────────────────────
+  if (text.startsWith("ลงทะเบียน") || text.includes("ลงทะเบียน")) {
+    const codeMatch = text.match(/รหัสพนักงาน\s*(\S+)/);
+    const nameMatch = text.match(/ชื่อ\s*([^\sแผนก]+)/) || text.match(/ชื่อ\s*(\S+)/);
+    const deptMatch = text.match(/แผนก\s*(\S+)/);
+    return {
+      action: "REGISTER",
+      employeeCode: codeMatch ? codeMatch[1].trim() : "",
+      name: nameMatch ? nameMatch[1].trim() : "",
+      departmentName: deptMatch ? deptMatch[1].trim() : "",
+    };
+  }
 
   // ─── 0. Note / Assign Task ────────────────────────────────
   const noteCheck = startsWith(text, NOTE_WORDS);

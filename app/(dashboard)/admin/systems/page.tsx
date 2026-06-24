@@ -35,9 +35,13 @@ export default function SystemsPage() {
     color: "#3B82F6",
     icon: "⚙️",
     defaultAssigneeId: "",
+    isDefault: false,
+  });
+
+  const [editingLineOa, setEditingLineOa] = useState<SystemItem | null>(null);
+  const [lineOaForm, setLineOaForm] = useState({
     lineOaToken: "",
     lineOaSecret: "",
-    isDefault: false,
   });
 
   const [saving, setSaving] = useState(false);
@@ -87,10 +91,9 @@ export default function SystemsPage() {
       color: sys.color || "#3B82F6",
       icon: sys.icon || "⚙️",
       defaultAssigneeId: sys.defaultAssignee?.id || "",
-      lineOaToken: sys.lineOaToken ? "●●●●●●●●●●" : "",
-      lineOaSecret: sys.lineOaSecret ? "●●●●●●●●●●" : "",
       isDefault: sys.isDefault || false,
     });
+    setEditingLineOa(null);
     setShowForm(false);
     setError("");
   }
@@ -104,7 +107,7 @@ export default function SystemsPage() {
     }
     setSaving(true);
 
-    const payload: any = {
+    const payload = {
       name: editForm.name,
       description: editForm.description || null,
       color: editForm.color,
@@ -112,12 +115,6 @@ export default function SystemsPage() {
       defaultAssigneeId: editForm.defaultAssigneeId || null,
       isDefault: editForm.isDefault,
     };
-    if (editForm.lineOaToken !== "●●●●●●●●●●") {
-      payload.lineOaToken = editForm.lineOaToken || null;
-    }
-    if (editForm.lineOaSecret !== "●●●●●●●●●●") {
-      payload.lineOaSecret = editForm.lineOaSecret || null;
-    }
 
     const res = await fetch(`/api/systems/${editingSystem.id}`, {
       method: "PATCH",
@@ -131,6 +128,46 @@ export default function SystemsPage() {
       return;
     }
     setEditingSystem(null);
+    setSaving(false);
+    loadSystems();
+  }
+
+  function handleLineOaClick(sys: SystemItem) {
+    setEditingLineOa(sys);
+    setLineOaForm({
+      lineOaToken: sys.lineOaToken ? "●●●●●●●●●●" : "",
+      lineOaSecret: sys.lineOaSecret ? "●●●●●●●●●●" : "",
+    });
+    setEditingSystem(null);
+    setShowForm(false);
+    setError("");
+  }
+
+  async function handleUpdateLineOa() {
+    if (!editingLineOa) return;
+    setError("");
+    setSaving(true);
+
+    const payload: any = {};
+    if (lineOaForm.lineOaToken !== "●●●●●●●●●●") {
+      payload.lineOaToken = lineOaForm.lineOaToken || null;
+    }
+    if (lineOaForm.lineOaSecret !== "●●●●●●●●●●") {
+      payload.lineOaSecret = lineOaForm.lineOaSecret || null;
+    }
+
+    const res = await fetch(`/api/systems/${editingLineOa.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error);
+      setSaving(false);
+      return;
+    }
+    setEditingLineOa(null);
     setSaving(false);
     loadSystems();
   }
@@ -381,26 +418,7 @@ export default function SystemsPage() {
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
               />
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">LINE OA Access Token</label>
-              <input
-                type="password"
-                className="input-field mt-1"
-                placeholder="LINE Channel Access Token"
-                value={editForm.lineOaToken}
-                onChange={(e) => setEditForm({ ...editForm, lineOaToken: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">LINE OA Channel Secret</label>
-              <input
-                type="password"
-                className="input-field mt-1"
-                placeholder="LINE Channel Secret"
-                value={editForm.lineOaSecret}
-                onChange={(e) => setEditForm({ ...editForm, lineOaSecret: e.target.value })}
-              />
-            </div>
+            {/* LINE OA configuration fields moved to a separate settings panel below */}
             <div className="flex items-center gap-2 mt-2 sm:col-span-2">
               <input
                 type="checkbox"
@@ -425,6 +443,52 @@ export default function SystemsPage() {
               บันทึกการแก้ไข
             </button>
             <button onClick={() => setEditingSystem(null)} className="btn-secondary">
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* LINE OA Connection Form */}
+      {editingLineOa && (
+        <div className="card border-purple-200 bg-purple-50/20">
+          <h3 className="font-semibold text-purple-900 mb-4 flex items-center gap-2">
+            🔌 ตั้งค่า LINE OA สำหรับระบบ: {editingLineOa.name}
+          </h3>
+          {error && <div className="text-sm text-red-600 bg-red-50 rounded-lg p-3 mb-4">{error}</div>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">LINE OA Access Token</label>
+              <input
+                type="password"
+                className="input-field mt-1"
+                placeholder="LINE Channel Access Token"
+                value={lineOaForm.lineOaToken}
+                onChange={(e) => setLineOaForm({ ...lineOaForm, lineOaToken: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">LINE OA Channel Secret</label>
+              <input
+                type="password"
+                className="input-field mt-1"
+                placeholder="LINE Channel Secret"
+                value={lineOaForm.lineOaSecret}
+                onChange={(e) => setLineOaForm({ ...lineOaForm, lineOaSecret: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={handleUpdateLineOa}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2"
+              style={{ backgroundColor: "#7c3aed" }}
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              บันทึกการเชื่อมต่อ LINE
+            </button>
+            <button onClick={() => setEditingLineOa(null)} className="btn-secondary">
               ยกเลิก
             </button>
           </div>
@@ -510,11 +574,16 @@ export default function SystemsPage() {
               </div>
             </div>
 
-            {sys.defaultAssignee && (
-              <div className="mt-3 pt-2 border-t border-gray-50 text-xs text-gray-500">
-                👤 Dev หลัก: {sys.defaultAssignee.displayName}
-              </div>
-            )}
+            <div className="mt-3 pt-2 border-t border-gray-50 flex items-center justify-between text-xs text-gray-500">
+              <span>{sys.defaultAssignee ? `👤 Dev หลัก: ${sys.defaultAssignee.displayName}` : ""}</span>
+              <button
+                onClick={() => handleLineOaClick(sys)}
+                className="text-purple-600 hover:text-purple-800 hover:underline flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                title="ตั้งค่า LINE OA"
+              >
+                🔌 ตั้งค่า LINE OA
+              </button>
+            </div>
           </div>
         ))}
       </div>

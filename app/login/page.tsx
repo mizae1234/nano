@@ -21,6 +21,20 @@ function LoginPageContent() {
   const tenantSlug = searchParams.get("tenant") || "demo";
   const liffInitialized = useRef(false);
 
+  const getRedirectUrl = () => {
+    const redirectParam = searchParams.get("redirect");
+    if (redirectParam) {
+      try {
+        const url = new URL(redirectParam, window.location.origin);
+        url.searchParams.set("tenant", tenantSlug);
+        return url.pathname + url.search;
+      } catch (e) {
+        return `${redirectParam}${redirectParam.includes("?") ? "&" : "?"}tenant=${tenantSlug}`;
+      }
+    }
+    return `/ticket?tenant=${tenantSlug}`;
+  };
+
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
 
   // ─── โหลด LIFF SDK ──────────────────────────────────────────
@@ -68,7 +82,7 @@ function LoginPageContent() {
       }
 
       // Login สำเร็จ
-      window.location.href = `/ticket?tenant=${tenantSlug}`;
+      window.location.href = getRedirectUrl();
     } catch (err) {
       console.error("LINE login error:", err);
       setError("เกิดข้อผิดพลาด กรุณาลองใหม่");
@@ -126,7 +140,7 @@ function LoginPageContent() {
       }
 
       // Login สำเร็จ — redirect ไป ticket page
-      window.location.href = `/ticket?tenant=${tenantSlug}`;
+      window.location.href = getRedirectUrl();
     } catch (err) {
       console.error("Dev login error:", err);
       setError("เกิดข้อผิดพลาด กรุณาลองใหม่");

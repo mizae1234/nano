@@ -336,6 +336,117 @@ export async function POST(request: NextRequest) {
       };
 
       switch (action.action) {
+        case "REGISTER": {
+          let targetUser = await prisma.user.findFirst({
+            where: { tenantId: tenant.id, lineUid },
+          });
+
+          let matchedDeptId: string | null = null;
+          let matchedDeptName = "";
+          if (action.departmentName) {
+            const dept = await prisma.department.findFirst({
+              where: {
+                tenantId: tenant.id,
+                name: {
+                  equals: action.departmentName.trim(),
+                  mode: "insensitive",
+                },
+                isActive: true,
+              },
+            });
+            if (dept) {
+              matchedDeptId = dept.id;
+              matchedDeptName = dept.name;
+            }
+          }
+
+          if (!targetUser) {
+            let pictureUrl: string | null = null;
+            let finalName = action.name;
+            try {
+              if (sourceType !== "user" && lineGroupId) {
+                const profile = await getLineGroupMemberProfile(tenant.lineOaToken!, lineGroupId, lineUid);
+                pictureUrl = profile.pictureUrl || null;
+                if (!finalName) finalName = profile.displayName;
+              } else {
+                const profile = await getLineProfile(tenant.lineOaToken!, lineUid);
+                pictureUrl = profile.pictureUrl || null;
+                if (!finalName) finalName = profile.displayName;
+              }
+            } catch (err) {
+              console.error("Failed to get line profile in REGISTER:", err);
+            }
+
+            targetUser = await prisma.user.create({
+              data: {
+                tenantId: tenant.id,
+                lineUid,
+                displayName: finalName || "ผู้ใช้งานใหม่",
+                pictureUrl,
+                employeeCode: action.employeeCode || null,
+                departmentId: matchedDeptId,
+                role: "USER",
+              },
+            });
+          } else {
+            const updateData: Record<string, any> = {};
+            if (action.employeeCode) updateData.employeeCode = action.employeeCode;
+            if (action.name) updateData.displayName = action.name;
+            if (matchedDeptId) updateData.departmentId = matchedDeptId;
+
+            targetUser = await prisma.user.update({
+              where: { id: targetUser.id },
+              data: updateData,
+            });
+          }
+
+          let replyText = "";
+          if (action.employeeCode && action.name) {
+            replyText = `ลงทะเบียน รหัสพนักงาน: ${action.employeeCode} ชื่อ: ${action.name} สำเร็จแล้วค่ะ 🎉`;
+          } else if (action.employeeCode) {
+            replyText = `ลงทะเบียนรหัสพนักงาน: ${action.employeeCode} สำเร็จแล้วค่ะ 🎉 (คุณยังไม่ได้ระบุชื่อ)`;
+          } else if (action.name) {
+            replyText = `ลงทะเบียนชื่อ: ${action.name} สำเร็จแล้วค่ะ 🎉 (คุณยังไม่ได้ระบุรหัสพนักงาน)`;
+          } else {
+            replyText = `สวัสดีค่ะ คุณสามารถลงทะเบียนได้โดยพิมพ์ "ลงทะเบียน รหัสพนักงาน [รหัส] ชื่อ [ชื่อ] แผนก [แผนก]" หรือกดแก้ไขโปรไฟล์จากปุ่มด้านล่างนี้ได้เลยค่ะ 😊`;
+          }
+
+          if (action.departmentName) {
+            if (matchedDeptId) {
+              replyText += `\n🏢 สังกัดแผนก: ${matchedDeptName} เรียบร้อยค่ะ`;
+            } else {
+              replyText += `\n⚠️ ไม่พบแผนก "${action.departmentName}" ในระบบ (คุณสามารถแก้ไขแผนกได้ที่หน้าโปรไฟล์ค่ะ)`;
+            }
+          }
+
+          let displayDeptName = "ยังไม่ระบุแผนก";
+          if (targetUser.departmentId) {
+            const dept = await prisma.department.findUnique({
+              where: { id: targetUser.departmentId },
+              select: { name: true },
+            });
+            if (dept) displayDeptName = dept.name;
+          }
+
+          const redirectPath = `/profile`;
+          const profileUrl = `${appUrl}/login?redirect=${encodeURIComponent(redirectPath)}&tenant=${tenant.slug}`;
+
+          const { profileCardFlex } = await import("@/lib/nano-reply");
+          await reply([
+            { type: "text", text: replyText } as never,
+            profileCardFlex(
+              {
+                displayName: targetUser.displayName,
+                employeeCode: targetUser.employeeCode,
+                departmentName: displayDeptName,
+              },
+              profileUrl,
+              botMeta
+            ) as never,
+          ]);
+          break;
+        }
+
         case "GREETING": {
           const name = botMeta.botName || "น้องนาโน";
           await reply([

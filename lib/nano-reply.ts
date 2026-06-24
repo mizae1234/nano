@@ -800,3 +800,73 @@ export function toCarouselFlex(cards: any[], altText: string) {
   };
 }
 
+export function profileCardFlex(
+  user: { displayName: string; employeeCode?: string | null; departmentName?: string | null },
+  profileUrl: string,
+  bot?: BotMeta
+) {
+  const { botName, themeColor } = meta(bot);
+  return {
+    type: "flex",
+    altText: "บัตรข้อมูลพนักงาน",
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: headerBox("👤 โปรไฟล์พนักงาน", themeColor, botName),
+      body: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "16px",
+        spacing: "sm",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            alignItems: "center",
+            contents: [
+              {
+                type: "text",
+                text: user.displayName,
+                weight: "bold",
+                size: "md",
+                color: "#111827",
+                flex: 1,
+              },
+            ],
+          },
+          { type: "separator", margin: "md" },
+          {
+            type: "box",
+            layout: "vertical",
+            spacing: "xs",
+            margin: "md",
+            contents: [
+              infoRow("รหัสพนักงาน", user.employeeCode || "ยังไม่ระบุ"),
+              infoRow("ชื่อพนักงาน", user.displayName),
+              infoRow("แผนก", user.departmentName || "ยังไม่ระบุ"),
+            ],
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "12px",
+        contents: [
+          {
+            type: "button",
+            action: {
+              type: "uri",
+              label: "แก้ไขโปรไฟล์",
+              uri: profileUrl,
+            },
+            style: "primary",
+            color: themeColor,
+            height: "sm",
+          },
+        ],
+      },
+    },
+  };
+}
+

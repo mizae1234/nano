@@ -119,6 +119,7 @@ model User {
   department   Department? @relation(fields: [departmentId], references: [id])
   lineUid      String
   displayName  String
+  employeeCode String?
   pictureUrl   String?
   role         Role        @default(USER)
   isActive     Boolean     @default(true)
