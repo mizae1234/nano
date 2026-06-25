@@ -1157,7 +1157,10 @@ export async function POST(request: NextRequest) {
           const targetTicket = await prisma.ticket.findFirst({
             where: targetWhere,
             include: {
-              system: { select: { ticketPrefix: true } },
+              createdBy: { select: { displayName: true } },
+              assignedTo: { select: { displayName: true } },
+              department: { select: { name: true } },
+              system: { select: { name: true, icon: true, ticketPrefix: true } },
             },
           });
 
@@ -1171,10 +1174,6 @@ export async function POST(request: NextRequest) {
             break;
           }
 
-          const ticketRef = targetTicket.system?.ticketPrefix
-            ? `${targetTicket.system.ticketPrefix}-${targetTicket.ticketNo}`
-            : `#${targetTicket.ticketNo}`;
-
           const existingFollow = await prisma.ticketFollower.findUnique({
             where: {
               ticketId_userId: {
@@ -1185,21 +1184,61 @@ export async function POST(request: NextRequest) {
           });
 
           let isFollowing = false;
-          if (existingFollow) {
-            await prisma.ticketFollower.delete({
-              where: { id: existingFollow.id },
-            });
+          if (action.isUnfollow !== undefined) {
+            if (action.isUnfollow) {
+              if (existingFollow) {
+                await prisma.ticketFollower.delete({
+                  where: { id: existingFollow.id },
+                });
+              }
+              isFollowing = false;
+            } else {
+              if (!existingFollow) {
+                await prisma.ticketFollower.create({
+                  data: {
+                    ticketId: targetTicket.id,
+                    userId: user.id,
+                  },
+                });
+              }
+              isFollowing = true;
+            }
           } else {
-            await prisma.ticketFollower.create({
-              data: {
-                ticketId: targetTicket.id,
-                userId: user.id,
-              },
-            });
-            isFollowing = true;
+            // Fallback to toggle behavior if isUnfollow is not specified
+            if (existingFollow) {
+              await prisma.ticketFollower.delete({
+                where: { id: existingFollow.id },
+              });
+              isFollowing = false;
+            } else {
+              await prisma.ticketFollower.create({
+                data: {
+                  ticketId: targetTicket.id,
+                  userId: user.id,
+                },
+              });
+              isFollowing = true;
+            }
           }
 
-          await reply([followTicketFlex(ticketRef, isFollowing, botMeta) as never]);
+          const ticketInfo = {
+            id: targetTicket.id,
+            ticketNo: targetTicket.ticketNo,
+            title: targetTicket.title,
+            status: targetTicket.status,
+            priority: targetTicket.priority,
+            ticketType: targetTicket.ticketType,
+            departmentName: targetTicket.department?.name || undefined,
+            assignedToName: targetTicket.assignedTo?.displayName || undefined,
+            createdByName: targetTicket.createdBy.displayName,
+            systemName: targetTicket.system?.name || undefined,
+            systemIcon: targetTicket.system?.icon || undefined,
+            systemPrefix: targetTicket.system?.ticketPrefix || undefined,
+            createdAt: targetTicket.createdAt.toLocaleDateString("th-TH"),
+            dueDate: targetTicket.dueDate ? targetTicket.dueDate.toLocaleDateString("th-TH") : undefined,
+          };
+
+          await reply([followTicketFlex(ticketInfo, isFollowing, botMeta) as never]);
           break;
         }
 
