@@ -850,26 +850,42 @@ export default function TicketDetailPage() {
           {/* Follow Settings Card */}
           <div className="card space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {isFollowing ? (
-                  <Eye className="w-4 h-4 text-nano-600" />
-                ) : (
-                  <EyeOff className="w-4 h-4 text-gray-400" />
-                )}
-                <h3 className="text-sm font-semibold text-gray-900">ติดตามตั๋วใบนี้</h3>
-              </div>
-              <input
-                type="checkbox"
-                className="w-4 h-4 text-nano-600 border-gray-300 rounded focus:ring-nano-500 cursor-pointer"
-                checked={isFollowing}
-                onChange={(e) => handleToggleFollow(e.target.checked)}
-                disabled={followUpdating}
-              />
+              <h3 className="text-sm font-semibold text-gray-900">ติดตามตั๋วใบนี้</h3>
+              {isFollowing && (
+                <span className="inline-flex items-center gap-1 text-xs text-nano-600 bg-nano-50 px-2 py-0.5 rounded-full font-medium">
+                  <Eye className="w-3.5 h-3.5" />
+                  กำลังติดตาม
+                </span>
+              )}
             </div>
             
             <p className="text-xs text-gray-500">
               เมื่อติดตามตั๋วใบนี้ ระบบจะส่งการแจ้งเตือน LINE Flex Message ให้คุณเมื่อมีข้อมูลหรือสถานะอัปเดต
             </p>
+
+            <button
+              onClick={() => handleToggleFollow(!isFollowing)}
+              disabled={followUpdating}
+              className={`w-full text-xs py-2 flex items-center justify-center gap-1.5 shadow-sm hover:shadow transition-all font-semibold rounded-md ${
+                isFollowing
+                  ? "bg-red-50 text-red-650 border border-red-200 hover:bg-red-100"
+                  : "btn-primary"
+              }`}
+            >
+              {followUpdating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : isFollowing ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5" />
+                  ยกเลิกติดตามตั๋ว (Unfollow)
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5" />
+                  ติดตามตั๋วใบนี้ (Follow)
+                </>
+              )}
+            </button>
 
             {isFollowing && (
               <div className="space-y-3 pt-2 border-t border-gray-150">
