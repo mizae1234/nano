@@ -558,20 +558,81 @@ export function ticketUpdatedFlex(
 //  FOLLOW TICKET
 // ══════════════════════════════════════════════════════════════
 
-export function followTicketFlex(ticketRef: string, isFollowing: boolean, bot?: BotMeta) {
+export function followTicketFlex(
+  ticketOrRef: TicketInfo | string,
+  isFollowing: boolean,
+  bot?: BotMeta
+) {
   const { botName, botPersona, themeColor } = meta(bot);
+
+  let ticketRef = "";
+  let ticket: TicketInfo | null = null;
+
+  if (typeof ticketOrRef === "string") {
+    ticketRef = ticketOrRef;
+  } else {
+    ticket = ticketOrRef;
+    ticketRef = ticket.systemPrefix ? `${ticket.systemPrefix}-${ticket.ticketNo}` : `#${ticket.ticketNo}`;
+  }
+
   const title = isFollowing ? `✅ ติดตาม ${ticketRef} แล้ว` : `❌ ยกเลิกติดตาม ${ticketRef}`;
-  const msg = isFollowing
-    ? `จะแจ้งเมื่อ ${ticketRef} มีอัปเดต${botPersona}`
-    : `หยุดแจ้งเตือน ${ticketRef} แล้ว${botPersona}`;
+
+  if (!isFollowing || !ticket) {
+    const msg = isFollowing
+      ? `จะแจ้งเมื่อ ${ticketRef} มีอัปเดต${botPersona}`
+      : `หยุดแจ้งเตือน ${ticketRef} แล้ว${botPersona}`;
+    return {
+      type: "flex", altText: title,
+      contents: {
+        type: "bubble", size: "kilo",
+        header: headerBox(title, themeColor, botName),
+        body: {
+          type: "box", layout: "vertical", paddingAll: "12px",
+          contents: [{ type: "text", text: msg, size: "sm", wrap: true, color: "#555555" }],
+        },
+      },
+    };
+  }
+
+  // If following and detailed ticket is provided, show rich layout
   return {
     type: "flex", altText: title,
     contents: {
       type: "bubble", size: "kilo",
       header: headerBox(title, themeColor, botName),
       body: {
-        type: "box", layout: "vertical", paddingAll: "12px",
-        contents: [{ type: "text", text: msg, size: "sm", wrap: true, color: "#555555" }],
+        type: "box", layout: "vertical", paddingAll: "12px", spacing: "sm",
+        contents: [
+          {
+            type: "box", layout: "horizontal", alignItems: "center",
+            contents: [
+              { type: "text", text: `#${ticketRef}`, weight: "bold", size: "lg", color: themeColor, flex: 0 },
+              ...(ticket.systemName ? [{ type: "text" as const, text: `${ticket.systemIcon || "⚙️"} ${ticket.systemName}`, size: "xxs" as const, color: "#888888", align: "end" as const, flex: 1 }] : []),
+            ],
+          },
+          { type: "text", text: ticket.title, size: "sm", wrap: true, color: "#333333", weight: "bold" },
+          { type: "separator", margin: "sm" },
+          {
+            type: "box", layout: "vertical", spacing: "xs",
+            contents: [
+              infoRow("สถานะ", STATUS_LABEL[ticket.status as keyof typeof STATUS_LABEL] || ticket.status),
+              infoRow("ความสำคัญ", `${PRIORITY_EMOJI[ticket.priority] || ""} ${PRIORITY_LABEL[ticket.priority as keyof typeof PRIORITY_LABEL] || ticket.priority}`),
+              ...(ticket.departmentName ? [infoRow("แผนก", ticket.departmentName)] : []),
+              infoRow("ผู้แจ้ง", `👤 ${ticket.createdByName || "ไม่ทราบ"}`),
+              infoRow("ผู้รับผิดชอบ", ticket.assignedToName ? `👤 ${ticket.assignedToName}` : "ยังไม่มอบหมาย"),
+              ...(ticket.dueDate ? [infoRow("กำหนดส่ง", `📅 ${ticket.dueDate}`)] : []),
+            ],
+          },
+          { type: "separator", margin: "sm" },
+          {
+            type: "text",
+            text: `💡 หากดำเนินการเสร็จสิ้นแล้ว สามารถปิดตั๋วงานผ่าน LINE ได้โดยพิมพ์:\nปิด ${ticketRef}`,
+            size: "xxs",
+            color: "#6b7280",
+            wrap: true,
+            margin: "xs"
+          }
+        ],
       },
     },
   };

@@ -74,6 +74,12 @@ export async function POST(
 
     const ticket = await prisma.ticket.findFirst({
       where: { id: params.id, tenantId: session.tenantId },
+      include: {
+        createdBy: { select: { displayName: true } },
+        assignedTo: { select: { displayName: true } },
+        department: { select: { name: true } },
+        system: { select: { name: true, icon: true, ticketPrefix: true } },
+      },
     });
 
     if (!ticket) {
@@ -138,11 +144,8 @@ export async function POST(
       });
 
       if (tenant?.lineOaToken) {
-        const ticketRef = ticket.systemId
-          ? await prisma.system.findUnique({
-              where: { id: ticket.systemId },
-              select: { ticketPrefix: true },
-            }).then((s) => (s?.ticketPrefix ? `${s.ticketPrefix}-${ticket.ticketNo}` : `#${ticket.ticketNo}`))
+        const ticketRef = ticket.system?.ticketPrefix
+          ? `${ticket.system.ticketPrefix}-${ticket.ticketNo}`
           : `#${ticket.ticketNo}`;
 
         const botConfig = await prisma.botConfig.findUnique({
@@ -158,7 +161,24 @@ export async function POST(
         const { followTicketFlex } = await import("@/lib/nano-reply");
         const { pushMessage } = await import("@/lib/line");
 
-        const flexMsg = followTicketFlex(ticketRef, isFollowing, botMeta);
+        const ticketInfo = {
+          id: ticket.id,
+          ticketNo: ticket.ticketNo,
+          title: ticket.title,
+          status: ticket.status,
+          priority: ticket.priority,
+          ticketType: ticket.ticketType,
+          departmentName: ticket.department?.name || undefined,
+          assignedToName: ticket.assignedTo?.displayName || undefined,
+          createdByName: ticket.createdBy.displayName,
+          systemName: ticket.system?.name || undefined,
+          systemIcon: ticket.system?.icon || undefined,
+          systemPrefix: ticket.system?.ticketPrefix || undefined,
+          createdAt: ticket.createdAt.toLocaleDateString("th-TH"),
+          dueDate: ticket.dueDate ? ticket.dueDate.toLocaleDateString("th-TH") : undefined,
+        };
+
+        const flexMsg = followTicketFlex(ticketInfo, isFollowing, botMeta);
 
         if (!isFollowing) {
           // กรณีเลิกติดตาม: ส่งไปที่ DIRECT ของตนเองหากมี lineUid เพื่อยืนยัน
