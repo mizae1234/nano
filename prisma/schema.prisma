@@ -345,12 +345,14 @@ model ChatLog {
 // ─── TICKET FOLLOWER (Follow/Notify) ─────────────────────────
 
 model TicketFollower {
-  id        String   @id @default(cuid())
-  ticketId  String
-  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  ticketId      String
+  ticket        Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  notifyChannel String   @default("DIRECT")
+  notifyGroupId String?
+  createdAt     DateTime @default(now())
 
   @@unique([ticketId, userId])
 }

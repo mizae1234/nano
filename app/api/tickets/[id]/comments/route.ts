@@ -107,14 +107,25 @@ export async function POST(
         const notifyMsg = `📢 ${ticketRef} มีความคิดเห็นใหม่จากคุณ ${comment.user.displayName}:\n"${comment.message.substring(0, 50)}${comment.message.length > 50 ? "..." : ""}"`;
         
         const { pushMessage } = await import("@/lib/line");
-        const uids = followers.map((f) => f.user.lineUid).filter(Boolean);
-        for (const uid of uids) {
+        for (const follower of followers) {
           try {
-            await pushMessage(tenant.lineOaToken, uid, [
-              { type: "text", text: notifyMsg } as any,
-            ]);
+            if (follower.notifyChannel === "DIRECT" && follower.user.lineUid) {
+              await pushMessage(tenant.lineOaToken, follower.user.lineUid, [
+                { type: "text", text: notifyMsg } as any,
+              ]);
+            } else if (follower.notifyChannel === "GROUP" && follower.notifyGroupId) {
+              const g = await prisma.groupConfig.findUnique({
+                where: { id: follower.notifyGroupId },
+                select: { lineGroupId: true },
+              });
+              if (g?.lineGroupId) {
+                await pushMessage(tenant.lineOaToken, g.lineGroupId, [
+                  { type: "text", text: notifyMsg } as any,
+                ]);
+              }
+            }
           } catch (err) {
-            console.error(`Failed to push comment notification to follower ${uid}:`, err);
+            console.error(`Failed to push comment notification to follower ${follower.id}:`, err);
           }
         }
       }

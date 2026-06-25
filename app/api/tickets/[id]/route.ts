@@ -191,7 +191,7 @@ export async function PATCH(
         createdBy: { select: { displayName: true, lineUid: true } },
         assignedTo: { select: { displayName: true } },
         department: { select: { name: true } },
-        system: { select: { ticketPrefix: true } },
+        system: { select: { name: true, icon: true, ticketPrefix: true } },
       },
     });
 
@@ -225,20 +225,59 @@ export async function PATCH(
         });
 
         if (followers.length > 0 && tenant?.lineOaToken) {
-          const ticketRef = updated.system?.ticketPrefix
-            ? `${updated.system.ticketPrefix}-${updated.ticketNo}`
-            : `#${updated.ticketNo}`;
-          const changeMsg = `📢 ${ticketRef} อัปเดต: ${auditDetails.join(", ")}`;
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://nano.technomand-ai.cloud";
+          const detailUrl = `${appUrl}/ticket/${updated.id}`;
 
+          const botConfig = await prisma.botConfig.findUnique({
+            where: { tenantId: session.tenantId },
+            select: { botName: true, botPersona: true, themeColor: true },
+          });
+          const botMeta = {
+            botName: botConfig?.botName,
+            botPersona: botConfig?.botPersona,
+            themeColor: botConfig?.themeColor || "#0066FF",
+          };
+
+          const { ticketUpdatedFlex } = await import("@/lib/nano-reply");
           const { pushMessage } = await import("@/lib/line");
-          const uids = followers.map((f) => f.user.lineUid).filter(Boolean);
-          for (const uid of uids) {
+
+          const ticketInfo = {
+            ticketNo: updated.ticketNo,
+            title: updated.title,
+            status: updated.status,
+            priority: updated.priority,
+            ticketType: updated.ticketType || undefined,
+            departmentName: updated.department?.name || undefined,
+            assignedToName: updated.assignedTo?.displayName || undefined,
+            createdByName: updated.createdBy?.displayName || undefined,
+            systemName: updated.system?.name || undefined,
+            systemIcon: updated.system?.icon || undefined,
+            systemPrefix: updated.system?.ticketPrefix || undefined,
+            createdAt: updated.createdAt.toLocaleDateString("th-TH"),
+          };
+
+          const changeMsg = auditDetails.join(", ");
+          const flexMsg = ticketUpdatedFlex(ticketInfo, changeMsg, detailUrl, botMeta);
+
+          for (const follower of followers) {
             try {
-              await pushMessage(tenant.lineOaToken, uid, [
-                { type: "text", text: changeMsg } as any,
-              ]);
+              if (follower.notifyChannel === "DIRECT" && follower.user.lineUid) {
+                await pushMessage(tenant.lineOaToken, follower.user.lineUid, [
+                  flexMsg as any,
+                ]);
+              } else if (follower.notifyChannel === "GROUP" && follower.notifyGroupId) {
+                const g = await prisma.groupConfig.findUnique({
+                  where: { id: follower.notifyGroupId },
+                  select: { lineGroupId: true },
+                });
+                if (g?.lineGroupId) {
+                  await pushMessage(tenant.lineOaToken, g.lineGroupId, [
+                    flexMsg as any,
+                  ]);
+                }
+              }
             } catch (err) {
-              console.error(`Failed to push notification to follower ${uid}:`, err);
+              console.error(`Failed to push notification to follower ${follower.id}:`, err);
             }
           }
         }

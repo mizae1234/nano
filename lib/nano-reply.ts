@@ -446,6 +446,94 @@ export function ticketStatusFlex(ticket: TicketInfo, bot?: BotMeta) {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  TICKET UPDATED FLEX ✨
+// ══════════════════════════════════════════════════════════════
+
+export function ticketUpdatedFlex(
+  ticket: TicketInfo,
+  updateMessage: string,
+  detailUrl: string,
+  bot?: BotMeta
+) {
+  const { botName, themeColor } = meta(bot);
+  const ticketRef = ticket.systemPrefix ? `${ticket.systemPrefix}-${ticket.ticketNo}` : `#${ticket.ticketNo}`;
+  const headerColor = themeColor;
+
+  return {
+    type: "flex",
+    altText: `📢 ตั๋วงาน #${ticketRef} อัปเดตข้อมูล`,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "horizontal",
+        paddingAll: "10px",
+        backgroundColor: headerColor,
+        alignItems: "center",
+        contents: [
+          { type: "text", text: botName, size: "xxs", color: "#ffffff", flex: 3 },
+          { type: "text", text: "📢 อัปเดตตั๋วงาน", size: "xxs", color: "#ffffffcc", align: "end", flex: 5 },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "12px",
+        spacing: "sm",
+        contents: [
+          {
+            type: "box",
+            layout: "horizontal",
+            alignItems: "center",
+            contents: [
+              { type: "text", text: `#${ticketRef}`, weight: "bold", size: "lg", color: headerColor, flex: 0 },
+              ...(ticket.systemName ? [{ type: "text" as const, text: `${ticket.systemIcon || "⚙️"} ${ticket.systemName}`, size: "xxs" as const, color: "#888888", align: "end" as const, flex: 1 }] : []),
+            ],
+          },
+          { type: "text", text: ticket.title, size: "sm", wrap: true, color: "#333333", weight: "bold" },
+          
+          // กล่องแสดงการอัปเดต (Highlight update block)
+          {
+            type: "box",
+            layout: "vertical",
+            backgroundColor: "#F3F4F6",
+            paddingAll: "8px",
+            cornerRadius: "sm",
+            margin: "sm",
+            contents: [
+              { type: "text", text: updateMessage, size: "xs", color: "#111827", wrap: true, weight: "bold" },
+            ],
+          },
+          
+          { type: "separator", margin: "sm" },
+          {
+            type: "box",
+            layout: "vertical",
+            spacing: "xs",
+            contents: [
+              infoRow("สถานะ", STATUS_LABEL[ticket.status as keyof typeof STATUS_LABEL] || ticket.status),
+              infoRow("ความสำคัญ", `${PRIORITY_EMOJI[ticket.priority] || ""} ${PRIORITY_LABEL[ticket.priority as keyof typeof PRIORITY_LABEL] || ticket.priority}`),
+              ...(ticket.departmentName ? [infoRow("แผนก", ticket.departmentName)] : []),
+              infoRow("ผู้รับผิดชอบ", ticket.assignedToName ? `👤 ${ticket.assignedToName}` : "ยังไม่มอบหมาย"),
+            ],
+          },
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingAll: "10px",
+        contents: [
+          { type: "button", action: { type: "uri", label: "🌐 ดูรายละเอียดบนเว็บ", uri: detailUrl }, style: "primary", color: themeColor, height: "sm" },
+        ],
+      },
+    },
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
 //  FOLLOW TICKET
 // ══════════════════════════════════════════════════════════════
 

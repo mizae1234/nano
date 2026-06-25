@@ -20,6 +20,8 @@ import {
   AlertTriangle,
   Image,
   Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 interface CommentItem {
@@ -128,6 +130,12 @@ export default function TicketDetailPage() {
   const [groups, setGroups] = useState<any[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
 
+  // ติดตามตั๋ว (Follower settings)
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerNotifyChannel, setFollowerNotifyChannel] = useState("DIRECT");
+  const [followerNotifyGroupId, setFollowerNotifyGroupId] = useState<string | null>(null);
+  const [followUpdating, setFollowUpdating] = useState(false);
+
   useEffect(() => {
     loadSessionAndTicket();
   }, [id]);
@@ -166,11 +174,65 @@ export default function TicketDetailPage() {
       const groupsRes = await fetch("/api/groups").then((r) => r.json()).catch(() => []);
       setGroups(groupsRes.groups || groupsRes || []);
 
+      // โหลดสถานะการติดตามของตนเอง
+      const followRes = await fetch(`/api/tickets/${id}/follow`).then((r) => r.json()).catch(() => ({}));
+      setIsFollowing(followRes.isFollowing || false);
+      setFollowerNotifyChannel(followRes.notifyChannel || "DIRECT");
+      setFollowerNotifyGroupId(followRes.notifyGroupId || null);
+
       setLoading(false);
     } catch (err) {
       console.error(err);
       setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
       setLoading(false);
+    }
+  }
+
+  async function handleToggleFollow(updatedIsFollowing: boolean) {
+    setFollowUpdating(true);
+    try {
+      const res = await fetch(`/api/tickets/${id}/follow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isFollowing: updatedIsFollowing,
+          notifyChannel: followerNotifyChannel,
+          notifyGroupId: followerNotifyGroupId,
+        }),
+      }).then((r) => r.json());
+
+      setIsFollowing(res.isFollowing);
+      if (res.isFollowing) {
+        setFollowerNotifyChannel(res.notifyChannel || "DIRECT");
+        setFollowerNotifyGroupId(res.notifyGroupId || null);
+      }
+    } catch (err) {
+      console.error("Error toggling follow:", err);
+    } finally {
+      setFollowUpdating(false);
+    }
+  }
+
+  async function handleUpdateFollowSettings(channel: string, groupId: string | null) {
+    setFollowUpdating(true);
+    try {
+      const res = await fetch(`/api/tickets/${id}/follow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isFollowing: true,
+          notifyChannel: channel,
+          notifyGroupId: groupId,
+        }),
+      }).then((r) => r.json());
+
+      setIsFollowing(res.isFollowing);
+      setFollowerNotifyChannel(res.notifyChannel || "DIRECT");
+      setFollowerNotifyGroupId(res.notifyGroupId || null);
+    } catch (err) {
+      console.error("Error updating follow settings:", err);
+    } finally {
+      setFollowUpdating(false);
     }
   }
 
@@ -782,6 +844,67 @@ export default function TicketDetailPage() {
                   </div>
                 )}
               </>
+            )}
+          </div>
+
+          {/* Follow Settings Card */}
+          <div className="card space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {isFollowing ? (
+                  <Eye className="w-4 h-4 text-nano-600" />
+                ) : (
+                  <EyeOff className="w-4 h-4 text-gray-400" />
+                )}
+                <h3 className="text-sm font-semibold text-gray-900">ติดตามตั๋วใบนี้</h3>
+              </div>
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-nano-600 border-gray-300 rounded focus:ring-nano-500 cursor-pointer"
+                checked={isFollowing}
+                onChange={(e) => handleToggleFollow(e.target.checked)}
+                disabled={followUpdating}
+              />
+            </div>
+            
+            <p className="text-xs text-gray-500">
+              เมื่อติดตามตั๋วใบนี้ ระบบจะส่งการแจ้งเตือน LINE Flex Message ให้คุณเมื่อมีข้อมูลหรือสถานะอัปเดต
+            </p>
+
+            {isFollowing && (
+              <div className="space-y-3 pt-2 border-t border-gray-150">
+                {/* Notify Channel Selection */}
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">ช่องทางการแจ้งเตือน</label>
+                  <select
+                    className="input-field text-sm !py-1"
+                    value={followerNotifyChannel}
+                    onChange={(e) => handleUpdateFollowSettings(e.target.value, followerNotifyGroupId)}
+                    disabled={followUpdating}
+                  >
+                    <option value="DIRECT">LINE ส่วนตัว (Direct Message)</option>
+                    <option value="GROUP">LINE Group</option>
+                  </select>
+                </div>
+
+                {/* Group Selection */}
+                {followerNotifyChannel === "GROUP" && (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">เลือกกลุ่มไลน์สำหรับแจ้งเตือน</label>
+                    <select
+                      className="input-field text-sm !py-1"
+                      value={followerNotifyGroupId || ""}
+                      onChange={(e) => handleUpdateFollowSettings(followerNotifyChannel, e.target.value || null)}
+                      disabled={followUpdating}
+                    >
+                      <option value="">-- เลือกกลุ่มไลน์ --</option>
+                      {groups.map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
