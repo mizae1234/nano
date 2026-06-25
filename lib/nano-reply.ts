@@ -25,6 +25,7 @@ function meta(bot?: BotMeta): Required<BotMeta> {
 }
 
 interface TicketInfo {
+  id?: string;
   ticketNo: number;
   title: string;
   status: string;
@@ -345,8 +346,17 @@ export function ticketListFlex(tickets: TicketInfo[], baseUrl: string, allTicket
         ],
       },
       footer: {
-        type: "box", layout: "vertical", paddingAll: "8px",
-        contents: [{ type: "button", action: { type: "message", label: "สถานะ", text: `สถานะ ${ticketRef}` }, style: "secondary", height: "sm" }],
+        type: "box", layout: "horizontal", paddingAll: "8px", spacing: "sm",
+        contents: [
+          { type: "button", action: { type: "message", label: "สถานะ", text: `สถานะ ${ticketRef}` }, style: "secondary", height: "sm" },
+          ...(ticket.id ? [{
+            type: "button",
+            action: { type: "uri", label: "รายละเอียด", uri: `${baseUrl}/ticket/${ticket.id}` },
+            style: "primary",
+            color: themeColor,
+            height: "sm"
+          } as const] : [])
+        ],
       },
     };
   });

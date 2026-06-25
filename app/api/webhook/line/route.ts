@@ -973,6 +973,7 @@ export async function POST(request: NextRequest) {
           await reply([
             ticketListFlex(
               tickets.map((t) => ({
+                id: t.id,
                 ticketNo: t.ticketNo,
                 title: t.title,
                 status: t.status,
