@@ -525,9 +525,20 @@ export function ticketUpdatedFlex(
               infoRow("สถานะ", STATUS_LABEL[ticket.status as keyof typeof STATUS_LABEL] || ticket.status),
               infoRow("ความสำคัญ", `${PRIORITY_EMOJI[ticket.priority] || ""} ${PRIORITY_LABEL[ticket.priority as keyof typeof PRIORITY_LABEL] || ticket.priority}`),
               ...(ticket.departmentName ? [infoRow("แผนก", ticket.departmentName)] : []),
+              infoRow("ผู้แจ้ง", `👤 ${ticket.createdByName || "ไม่ทราบ"}`),
               infoRow("ผู้รับผิดชอบ", ticket.assignedToName ? `👤 ${ticket.assignedToName}` : "ยังไม่มอบหมาย"),
+              ...(ticket.dueDate ? [infoRow("กำหนดส่ง", `📅 ${ticket.dueDate}`)] : []),
             ],
           },
+          { type: "separator", margin: "sm" },
+          {
+            type: "text",
+            text: `💡 หากดำเนินการเสร็จสิ้นแล้ว สามารถปิดตั๋วงานผ่าน LINE ได้โดยพิมพ์:\nปิด ${ticketRef}`,
+            size: "xxs",
+            color: "#6b7280",
+            wrap: true,
+            margin: "xs"
+          }
         ],
       },
       footer: {

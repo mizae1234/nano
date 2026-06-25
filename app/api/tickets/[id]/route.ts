@@ -254,6 +254,7 @@ export async function PATCH(
             systemIcon: updated.system?.icon || undefined,
             systemPrefix: updated.system?.ticketPrefix || undefined,
             createdAt: updated.createdAt.toLocaleDateString("th-TH"),
+            dueDate: updated.dueDate ? updated.dueDate.toLocaleDateString("th-TH") : undefined,
           };
 
           const changeMsg = auditDetails.join(", ");
