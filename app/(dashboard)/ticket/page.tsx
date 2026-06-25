@@ -119,25 +119,66 @@ export default function MyTicketsPage() {
   const [draggedTicketId, setDraggedTicketId] = useState<string | null>(null);
   const [draggedOverCol, setDraggedOverCol] = useState<string | null>(null);
 
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [systems, setSystems] = useState<{ id: string; name: string; icon?: string | null }[]>([]);
+  const [selectedDept, setSelectedDept] = useState("");
+  const [selectedSystem, setSelectedSystem] = useState("");
+
   useEffect(() => {
+    // 1. Fetch tickets
     fetch("/api/tickets?limit=200")
       .then((r) => r.json())
       .then((d) => { setTickets(d.tickets || []); setLoading(false); })
       .catch(() => setLoading(false));
+
+    // 2. Fetch departments
+    fetch("/api/departments")
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d)) {
+          setDepartments(d);
+        }
+      })
+      .catch((e) => console.error("Error loading departments:", e));
+
+    // 3. Fetch systems
+    fetch("/api/systems")
+      .then((r) => r.json())
+      .then((s) => {
+        if (s && Array.isArray(s.systems)) {
+          setSystems(s.systems);
+        }
+      })
+      .catch((e) => console.error("Error loading systems:", e));
   }, []);
 
   const filtered = tickets.filter((t) => {
-    if (!searchQuery) return true;
-    const display = t.system ? `${t.system.ticketPrefix}-${t.ticketNo}` : `#${t.ticketNo}`;
-    const q = searchQuery.toLowerCase();
-    return t.title.toLowerCase().includes(q) || display.toLowerCase().includes(q);
+    // Search Query Filter
+    if (searchQuery) {
+      const display = t.system ? `${t.system.ticketPrefix}-${t.ticketNo}` : `#${t.ticketNo}`;
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = t.title.toLowerCase().includes(q) || display.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+    }
+
+    // Department Filter
+    if (selectedDept) {
+      if (t.department?.name !== selectedDept) return false;
+    }
+
+    // System Filter
+    if (selectedSystem) {
+      if (t.system?.id !== selectedSystem) return false;
+    }
+
+    return true;
   });
 
   const stats = {
-    total: tickets.length,
-    open: tickets.filter((t) => t.status === "OPEN").length,
-    inProgress: tickets.filter((t) => t.status === "IN_PROGRESS").length,
-    resolved: tickets.filter((t) => t.status === "RESOLVED").length,
+    total: filtered.length,
+    open: filtered.filter((t) => t.status === "OPEN").length,
+    inProgress: filtered.filter((t) => t.status === "IN_PROGRESS").length,
+    resolved: filtered.filter((t) => t.status === "RESOLVED").length,
   };
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -252,6 +293,41 @@ export default function MyTicketsPage() {
           <PlusCircle className="w-4 h-4 mr-1" />
           แจ้งปัญหา
         </Link>
+      </div>
+
+      {/* Filters */}
+      <div className="grid grid-cols-2 gap-3 bg-gray-50/50 p-2 rounded-xl border border-gray-100">
+        <div>
+          <label className="block text-[10px] font-semibold text-gray-400 mb-1 pl-1">กรองตามแผนก</label>
+          <select
+            value={selectedDept}
+            onChange={(e) => setSelectedDept(e.target.value)}
+            className="input-field !py-1.5 text-xs bg-white cursor-pointer"
+          >
+            <option value="">ทุกแผนก</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.name}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-semibold text-gray-400 mb-1 pl-1">กรองตามระบบ</label>
+          <select
+            value={selectedSystem}
+            onChange={(e) => setSelectedSystem(e.target.value)}
+            className="input-field !py-1.5 text-xs bg-white cursor-pointer"
+          >
+            <option value="">ทุกระบบ</option>
+            {systems.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.icon || "⚙️"} {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* ─── KANBAN VIEW ─────────────────────────────────────────── */}
