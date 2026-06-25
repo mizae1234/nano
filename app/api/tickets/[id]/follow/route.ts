@@ -97,6 +97,8 @@ export async function POST(
 
     const body = await request.json();
     const { isFollowing, notifyChannel, notifyGroupId } = body;
+    const channel = notifyChannel === "GROUP" ? "GROUP" : "DIRECT";
+    const groupId = channel === "GROUP" ? notifyGroupId : null;
 
     if (!isFollowing) {
       // ยกเลิกการติดตาม
@@ -106,13 +108,9 @@ export async function POST(
           userId: session.id,
         },
       });
-      return NextResponse.json({ isFollowing: false });
     } else {
       // ติดตาม / อัปเดตการตั้งค่าการติดตาม
-      const channel = notifyChannel === "GROUP" ? "GROUP" : "DIRECT";
-      const groupId = channel === "GROUP" ? notifyGroupId : null;
-
-      const follower = await prisma.ticketFollower.upsert({
+      await prisma.ticketFollower.upsert({
         where: {
           ticketId_userId: {
             ticketId: params.id,
@@ -130,13 +128,83 @@ export async function POST(
           notifyGroupId: groupId,
         },
       });
-
-      return NextResponse.json({
-        isFollowing: true,
-        notifyChannel: follower.notifyChannel,
-        notifyGroupId: follower.notifyGroupId,
-      });
     }
+
+    // หลังจากบันทึกใน DB สำเร็จ ให้ส่ง LINE push notification ยืนยันการติดตาม
+    try {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: session.tenantId },
+        select: { lineOaToken: true },
+      });
+
+      if (tenant?.lineOaToken) {
+        const ticketRef = ticket.systemId
+          ? await prisma.system.findUnique({
+              where: { id: ticket.systemId },
+              select: { ticketPrefix: true },
+            }).then((s) => (s?.ticketPrefix ? `${s.ticketPrefix}-${ticket.ticketNo}` : `#${ticket.ticketNo}`))
+          : `#${ticket.ticketNo}`;
+
+        const botConfig = await prisma.botConfig.findUnique({
+          where: { tenantId: session.tenantId },
+          select: { botName: true, botPersona: true, themeColor: true },
+        });
+        const botMeta = {
+          botName: botConfig?.botName,
+          botPersona: botConfig?.botPersona,
+          themeColor: botConfig?.themeColor || "#0066FF",
+        };
+
+        const { followTicketFlex } = await import("@/lib/nano-reply");
+        const { pushMessage } = await import("@/lib/line");
+
+        const flexMsg = followTicketFlex(ticketRef, isFollowing, botMeta);
+
+        if (!isFollowing) {
+          // กรณีเลิกติดตาม: ส่งไปที่ DIRECT ของตนเองหากมี lineUid เพื่อยืนยัน
+          const userRecord = await prisma.user.findUnique({
+            where: { id: session.id },
+            select: { lineUid: true },
+          });
+          if (userRecord?.lineUid) {
+            await pushMessage(tenant.lineOaToken, userRecord.lineUid, [
+              flexMsg as any,
+            ]);
+          }
+        } else {
+          // กรณีเริ่มติดตาม: ส่งไปช่องทางที่เลือก (DIRECT หรือ GROUP)
+          if (channel === "DIRECT") {
+            const userRecord = await prisma.user.findUnique({
+              where: { id: session.id },
+              select: { lineUid: true },
+            });
+            if (userRecord?.lineUid) {
+              await pushMessage(tenant.lineOaToken, userRecord.lineUid, [
+                flexMsg as any,
+              ]);
+            }
+          } else if (channel === "GROUP" && groupId) {
+            const g = await prisma.groupConfig.findUnique({
+              where: { id: groupId },
+              select: { lineGroupId: true },
+            });
+            if (g?.lineGroupId) {
+              await pushMessage(tenant.lineOaToken, g.lineGroupId, [
+                flexMsg as any,
+              ]);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to send follow confirmation notification:", err);
+    }
+
+    return NextResponse.json({
+      isFollowing,
+      notifyChannel: channel,
+      notifyGroupId: groupId,
+    });
   } catch (error) {
     console.error("POST /api/tickets/[id]/follow error:", error);
     return NextResponse.json(
