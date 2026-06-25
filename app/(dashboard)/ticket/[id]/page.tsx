@@ -863,6 +863,54 @@ export default function TicketDetailPage() {
               เมื่อติดตามตั๋วใบนี้ ระบบจะส่งการแจ้งเตือน LINE Flex Message ให้คุณเมื่อมีข้อมูลหรือสถานะอัปเดต
             </p>
 
+            <div className="space-y-3 pt-2 border-t border-gray-150">
+              {/* Notify Channel Selection */}
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">ช่องทางการแจ้งเตือน</label>
+                <select
+                  className="input-field text-sm !py-1"
+                  value={followerNotifyChannel}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (isFollowing) {
+                      handleUpdateFollowSettings(val, followerNotifyGroupId);
+                    } else {
+                      setFollowerNotifyChannel(val);
+                    }
+                  }}
+                  disabled={followUpdating}
+                >
+                  <option value="DIRECT">LINE ส่วนตัว (Direct Message)</option>
+                  <option value="GROUP">LINE Group</option>
+                </select>
+              </div>
+
+              {/* Group Selection */}
+              {followerNotifyChannel === "GROUP" && (
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">เลือกกลุ่มไลน์สำหรับแจ้งเตือน</label>
+                  <select
+                    className="input-field text-sm !py-1"
+                    value={followerNotifyGroupId || ""}
+                    onChange={(e) => {
+                      const val = e.target.value || null;
+                      if (isFollowing) {
+                        handleUpdateFollowSettings(followerNotifyChannel, val);
+                      } else {
+                        setFollowerNotifyGroupId(val);
+                      }
+                    }}
+                    disabled={followUpdating}
+                  >
+                    <option value="">-- เลือกกลุ่มไลน์ --</option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => handleToggleFollow(!isFollowing)}
               disabled={followUpdating}
@@ -886,42 +934,6 @@ export default function TicketDetailPage() {
                 </>
               )}
             </button>
-
-            {isFollowing && (
-              <div className="space-y-3 pt-2 border-t border-gray-150">
-                {/* Notify Channel Selection */}
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">ช่องทางการแจ้งเตือน</label>
-                  <select
-                    className="input-field text-sm !py-1"
-                    value={followerNotifyChannel}
-                    onChange={(e) => handleUpdateFollowSettings(e.target.value, followerNotifyGroupId)}
-                    disabled={followUpdating}
-                  >
-                    <option value="DIRECT">LINE ส่วนตัว (Direct Message)</option>
-                    <option value="GROUP">LINE Group</option>
-                  </select>
-                </div>
-
-                {/* Group Selection */}
-                {followerNotifyChannel === "GROUP" && (
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1">เลือกกลุ่มไลน์สำหรับแจ้งเตือน</label>
-                    <select
-                      className="input-field text-sm !py-1"
-                      value={followerNotifyGroupId || ""}
-                      onChange={(e) => handleUpdateFollowSettings(followerNotifyChannel, e.target.value || null)}
-                      disabled={followUpdating}
-                    >
-                      <option value="">-- เลือกกลุ่มไลน์ --</option>
-                      {groups.map((g) => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
