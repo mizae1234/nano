@@ -37,6 +37,7 @@ interface TicketInfo {
   systemIcon?: string;
   systemPrefix?: string;
   createdAt: string;
+  dueDate?: string;
 }
 
 interface SystemInfo {
@@ -222,6 +223,8 @@ export function ticketCreatedFlex(ticket: TicketInfo, detailUrl: string, bot?: B
               infoRow("สถานะ", STATUS_LABEL[ticket.status as keyof typeof STATUS_LABEL] || ticket.status),
               ...(ticket.ticketType ? [infoRow("ประเภท", `${TICKET_TYPE_ICON[ticket.ticketType as keyof typeof TICKET_TYPE_ICON] || ""} ${TICKET_TYPE_LABEL[ticket.ticketType as keyof typeof TICKET_TYPE_LABEL] || ticket.ticketType}`)] : []),
               infoRow("Priority", `${PRIORITY_EMOJI[ticket.priority] || ""} ${PRIORITY_LABEL[ticket.priority as keyof typeof PRIORITY_LABEL] || ticket.priority}`),
+              ...(ticket.assignedToName ? [infoRow("ผู้รับผิดชอบ", ticket.assignedToName)] : []),
+              ...(ticket.dueDate ? [infoRow("กำหนดส่ง", ticket.dueDate)] : []),
             ],
           },
         ],

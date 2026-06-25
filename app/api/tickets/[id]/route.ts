@@ -171,6 +171,15 @@ export async function PATCH(
       auditDetails.push("อัปเดตรูปแนบปัญหาเพิ่มเติม");
     }
 
+    if (body.dueDate !== undefined && body.dueDate !== ticket.dueDate) {
+      updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+      if (body.dueDate) {
+        auditDetails.push(`เปลี่ยนวันกำหนดส่งเป็น ${new Date(body.dueDate).toLocaleDateString("th-TH")}`);
+      } else {
+        auditDetails.push("ยกเลิกวันกำหนดส่ง");
+      }
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "ไม่มีข้อมูลที่ต้องอัปเดต" }, { status: 400 });
     }

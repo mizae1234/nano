@@ -74,6 +74,9 @@ export function canAccessTicket(
   // ADMIN & SUPER_ADMIN เห็นทุก ticket ในองค์กร
   if (hasMinRole(userRole, "ADMIN")) return true;
 
+  // ผู้รับผิดชอบ (assignee) ไม่ว่าจะ role ไหน ก็ต้องเห็น ticket ได้
+  if (ticket.assignedToId === userId) return true;
+
   // DEPT_ADMIN เห็น ticket ใน dept ตัวเอง
   if (userRole === "DEPT_ADMIN" && userDeptId === ticket.departmentId) return true;
 
@@ -110,7 +113,13 @@ export function getTicketWhereByRole(
 
     case "USER":
     default:
-      return { ...base, createdById: userId };
+      return {
+        ...base,
+        OR: [
+          { createdById: userId },
+          { assignedToId: userId }
+        ]
+      };
   }
 }
 

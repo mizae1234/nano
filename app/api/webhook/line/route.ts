@@ -729,6 +729,27 @@ export async function POST(request: NextRequest) {
             break;
           }
 
+          // ค้นหาผู้รับผิดชอบเมื่อถูก Tag นำหน้า (เช่น bug @ChinJunG ...)
+          let assignedToId = system.defaultAssigneeId;
+          if ('assigneeName' in action && action.assigneeName) {
+            const assignedUser = await prisma.user.findFirst({
+              where: {
+                tenantId: tenant.id,
+                displayName: {
+                  contains: action.assigneeName,
+                  mode: "insensitive",
+                },
+                isActive: true,
+              },
+            });
+            if (assignedUser) {
+              assignedToId = assignedUser.id;
+            }
+          }
+
+          // วิเคราะห์ Due Date จากเนื้อหาข้อความ
+          const dueDate = parseDueDate(action.text);
+
           const lastTicket = await prisma.ticket.findFirst({
             where: { tenantId: tenant.id, systemId: system.id },
             orderBy: { ticketNo: "desc" },
@@ -744,12 +765,14 @@ export async function POST(request: NextRequest) {
               createdById: user.id,
               departmentId: user.departmentId,
               systemId: system.id,
-              assignedToId: system.defaultAssigneeId,
+              assignedToId,
               ticketType: action.ticketType || "BUG",
+              dueDate,
             },
             include: {
               department: { select: { name: true } },
               system: { select: { name: true, icon: true, ticketPrefix: true } },
+              assignedTo: { select: { displayName: true } },
             },
           });
 
@@ -777,6 +800,8 @@ export async function POST(request: NextRequest) {
                 systemIcon: ticket.system?.icon || undefined,
                 systemPrefix: ticket.system?.ticketPrefix,
                 createdAt: ticket.createdAt.toLocaleDateString("th-TH"),
+                assignedToName: ticket.assignedTo?.displayName || undefined,
+                dueDate: ticket.dueDate ? ticket.dueDate.toLocaleDateString("th-TH") : undefined,
               },
               `${appUrl}/ticket/${ticket.id}`,
               botMeta

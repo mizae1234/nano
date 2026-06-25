@@ -66,6 +66,7 @@ interface TicketDetail {
   assignedToId?: string | null;
   departmentId?: string | null;
   categoryId?: string | null;
+  dueDate?: string | null;
 }
 
 interface UserItem {
@@ -682,6 +683,29 @@ export default function TicketDetailPage() {
                 <div className="flex items-center gap-1.5 text-sm text-gray-700">
                   <User className="w-3.5 h-3.5 text-gray-400" />
                   {ticket.assignedTo?.displayName || "ยังไม่ได้มอบหมาย"}
+                </div>
+              )}
+            </div>
+
+            {/* Due Date */}
+            <div>
+              <div className="text-xs text-gray-400 mb-1">วันกำหนดส่ง (Due Date)</div>
+              {isIT ? (
+                <input
+                  type="date"
+                  className="input-field text-sm !py-1"
+                  value={ticket.dueDate ? new Date(ticket.dueDate).toISOString().substring(0, 10) : ""}
+                  onChange={(e) => handleUpdateField("dueDate", e.target.value ? new Date(e.target.value).toISOString() : null)}
+                  disabled={updating}
+                />
+              ) : (
+                <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                  <Clock className="w-3.5 h-3.5 text-gray-400" />
+                  {ticket.dueDate ? new Date(ticket.dueDate).toLocaleDateString("th-TH", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  }) : "ไม่ได้ระบุ"}
                 </div>
               )}
             </div>

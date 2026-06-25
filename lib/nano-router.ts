@@ -6,7 +6,7 @@ import { Plan, TicketType } from "@prisma/client";
 const TRIGGERS = ["นาโน", "@นาโน", "nano", "@nano"];
 
 export type NanoAction =
-  | { action: "CREATE_TICKET"; text: string; systemCode?: string; ticketType?: TicketType }
+  | { action: "CREATE_TICKET"; text: string; systemCode?: string; ticketType?: TicketType; assigneeName?: string }
   | { action: "ASSIGN_NOTE"; assigneeName: string; text: string; systemCode?: string }
   | { action: "LIST_TICKETS"; systemCode?: string }
   | { action: "CHECK_STATUS"; ticketNo: string; systemPrefix?: string }
@@ -197,7 +197,17 @@ export function parseNanoCommand(
       }
       return { action: "SHOW_SYSTEMS" };
     }
-    return { action: "CREATE_TICKET", text: cleanText, systemCode, ticketType: detectedType };
+
+    // Parse mention
+    const mentionMatch = cleanText.match(/@([^\s]+)/);
+    let assigneeName: string | undefined = undefined;
+    let finalCleanText = cleanText;
+    if (mentionMatch) {
+      assigneeName = mentionMatch[1];
+      finalCleanText = cleanText.replace(mentionMatch[0], "").trim();
+    }
+
+    return { action: "CREATE_TICKET", text: finalCleanText, systemCode, ticketType: detectedType, assigneeName };
   }
 
   // ─── 1. แจ้ง / แจ้งปัญหา ──────────────────────────────────
@@ -212,7 +222,17 @@ export function parseNanoCommand(
       }
       return { action: "SHOW_SYSTEMS" };
     }
-    return { action: "CREATE_TICKET", text: cleanText, systemCode };
+
+    // Parse mention
+    const mentionMatch = cleanText.match(/@([^\s]+)/);
+    let assigneeName: string | undefined = undefined;
+    let finalCleanText = cleanText;
+    if (mentionMatch) {
+      assigneeName = mentionMatch[1];
+      finalCleanText = cleanText.replace(mentionMatch[0], "").trim();
+    }
+
+    return { action: "CREATE_TICKET", text: finalCleanText, systemCode, assigneeName };
   }
 
   // ─── 2. ติดตาม ────────────────────────────────────────────
