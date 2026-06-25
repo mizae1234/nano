@@ -67,6 +67,11 @@ function LoginPageContent() {
     setError("");
     try {
       const accessToken = window.liff.getAccessToken();
+      if (!accessToken) {
+        // หากมีสถานะเข้าสู่ระบบแต่ไม่มี token หรือ token หมดอายุ ให้ล็อกอินใหม่เพื่อขอ token ใหม่ ป้องกัน Error 400
+        window.liff.login({ redirectUri: window.location.href });
+        return;
+      }
       const res = await fetch("/api/auth/line-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -109,6 +114,8 @@ function LoginPageContent() {
       return;
     }
 
+    setLiffLoading(true);
+
     if (window.liff.isLoggedIn()) {
       // มี session อยู่แล้ว
       await doLineLogin();
@@ -149,7 +156,21 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 bg-gradient-mesh px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 bg-gradient-mesh px-4 relative">
+      {/* Loading Overlay */}
+      {liffLoading && (
+        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-nano flex items-center justify-center shadow-nano animate-bounce">
+            <Bot className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex items-center gap-2 text-gray-600 font-medium">
+            <Loader2 className="w-5 h-5 animate-spin text-nano-500" />
+            <span>กำลังตรวจสอบข้อมูลผู้ใช้งาน...</span>
+          </div>
+          <p className="text-xs text-gray-400">กรุณารอสักครู่ ระบบกำลังเข้าสู่ระบบผ่าน LINE</p>
+        </div>
+      )}
+
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -193,49 +214,51 @@ function LoginPageContent() {
           </button>
 
           {/* Dev Bypass */}
-          <>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
+          {process.env.NODE_ENV !== "production" && (
+            <>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-white px-3 text-xs text-gray-400">
+                    สำหรับนักพัฒนา
+                  </span>
+                </div>
               </div>
-              <div className="relative flex justify-center">
-                <span className="bg-white px-3 text-xs text-gray-400">
-                  สำหรับนักพัฒนา
-                </span>
-              </div>
-            </div>
 
-            <div className="space-y-3">
-              <select
-                className="input-field text-sm"
-                value={devRole}
-                onChange={(e) => setDevRole(e.target.value)}
-              >
-                <option value="SUPER_ADMIN">ผู้ดูแลสูงสุด (SUPER_ADMIN)</option>
-                <option value="ADMIN">ผู้ดูแลระบบ (ADMIN)</option>
-                <option value="DEPT_ADMIN">หัวหน้าแผนก (DEPT_ADMIN)</option>
-                <option value="IT">เจ้าหน้าที่ IT (IT)</option>
-                <option value="USER">ผู้ใช้งาน (USER)</option>
-              </select>
-              <button
-                onClick={handleDevLogin}
-                disabled={isLoading}
-                className="btn-ghost w-full text-sm border border-gray-200 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    กำลังเข้าสู่ระบบ...
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4 mr-2" />
-                    Dev Login (ทดสอบ)
-                  </>
-                )}
-              </button>
-            </div>
-          </>
+              <div className="space-y-3">
+                <select
+                  className="input-field text-sm"
+                  value={devRole}
+                  onChange={(e) => setDevRole(e.target.value)}
+                >
+                  <option value="SUPER_ADMIN">ผู้ดูแลสูงสุด (SUPER_ADMIN)</option>
+                  <option value="ADMIN">ผู้ดูแลระบบ (ADMIN)</option>
+                  <option value="DEPT_ADMIN">หัวหน้าแผนก (DEPT_ADMIN)</option>
+                  <option value="IT">เจ้าหน้าที่ IT (IT)</option>
+                  <option value="USER">ผู้ใช้งาน (USER)</option>
+                </select>
+                <button
+                  onClick={handleDevLogin}
+                  disabled={isLoading}
+                  className="btn-ghost w-full text-sm border border-gray-200 disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      กำลังเข้าสู่ระบบ...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4 mr-2" />
+                      Dev Login (ทดสอบ)
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
